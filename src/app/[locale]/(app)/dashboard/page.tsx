@@ -21,9 +21,24 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
         <StatCard label={t("dashboard.attendance")} value={percentLabel(data.attendanceRate)} />
         <StatCard label={t("dashboard.conflicts")} value={String(data.conflictCount)} />
       </div>
+      <div className="mt-6 flex flex-wrap gap-3">
+        {[
+          { href: "/projects", label: locale === "ar" ? "المشاريع" : "Projects" },
+          { href: "/beneficiaries", label: locale === "ar" ? "المستفيدون" : "Beneficiaries" },
+          { href: "/courses", label: locale === "ar" ? "الدورات" : "Courses" },
+          { href: "/attendance", label: locale === "ar" ? "الحضور" : "Attendance" },
+        ].map((action) => (
+          <Link key={action.href} href={action.href} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
+            {action.label}
+          </Link>
+        ))}
+      </div>
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-        <section className="space-y-3">
+        <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-sm">
           <h2 className="font-semibold text-primary">{t("dashboard.progress")}</h2>
+          {data.projects.length === 0 && (
+            <p className="rounded-xl bg-secondary p-5 text-sm text-muted-foreground">{locale === "ar" ? "لا توجد مشاريع نشطة حالياً" : "No active projects yet"}</p>
+          )}
           {data.projects.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border bg-card p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -40,8 +55,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
             </Link>
           ))}
         </section>
-        <section>
+        <section className="rounded-2xl border bg-card p-5 shadow-sm">
           <h2 className="font-semibold text-primary">{t("dashboard.recent")}</h2>
+          {data.audits.length === 0 && <p className="mt-3 text-sm text-muted-foreground">{locale === "ar" ? "لا توجد أنشطة حديثة" : "No recent activity"}</p>}
           <ul className="mt-3 space-y-3">
             {data.audits.map((entry) => (
               <li key={entry.id} className="rounded-xl border bg-card p-3">
