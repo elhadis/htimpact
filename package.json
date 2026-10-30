@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/next.mjs dev --webpack",
     "dev:all": "node scripts/postgres.mjs dev",
-    "build": "prisma db push && prisma generate && node scripts/bootstrap-admin.mjs && node scripts/next.mjs build --webpack",
+    "build": "prisma db push && prisma generate && node scripts/bootstrap-admin.mjs && node scripts/seed-vercel-demo.mjs && node scripts/next.mjs build --webpack",
     "start": "next start",
     "lint": "eslint",
     "db:start": "node scripts/postgres.mjs start",
