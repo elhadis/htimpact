@@ -1,0 +1,15 @@
+{
+  "name": "HT Impact Manager",
+  "short_name": "HT Impact",
+  "description": "Program, beneficiary, and attendance management by HT Digital Solutions.",
+  "start_url": "/en",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F7FB",
+  "theme_color": "#0E2A47",
+  "lang": "en",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

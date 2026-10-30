@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectType {
+  EDUCATIONAL
+  NON_EDUCATIONAL
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+  UNSPECIFIED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  description String
+  users       User[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  phone        String?
+  title        String?
+  locale       String   @default("en")
+  active       Boolean  @default(true)
+  isDemo       Boolean  @default(false)
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  projectAssignments  ProjectStaff[]
+  attendanceTaken     AttendanceRecord[] @relation("TakenBy")
+  sessionsFacilitated Session[]          @relation("Facilitator")
+  auditLogs           AuditLog[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  name        String
+  description String?
+  type        ProjectType
+  status      ProjectStatus @default(DRAFT)
+  startDate   DateTime
+  endDate     DateTime?
+  location    String?
+  donor       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  targets       ProjectTarget[]
+  staff         ProjectStaff[]
+  beneficiaries ProjectBeneficiary[]
+  courses       Course[]
+  activities    Activity[]
+}
+
+model ProjectTarget {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  metricKey   String
+  label       String
+  targetValue Int
+  unit        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, metricKey])
+}
+
+model ProjectStaff {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+}
+
+model Beneficiary {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  firstName   String
+  lastName    String
+  gender      Gender    @default(UNSPECIFIED)
+  dateOfBirth DateTime?
+  phone       String?
+  nationalId  String?   @unique
+  community   String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  projects      ProjectBeneficiary[]
+  enrollments   CohortEnrollment[]
+  attendance    AttendanceRecord[]
+  participation ParticipationLog[]
+}
+
+model ProjectBeneficiary {
+  id              String      @id @default(cuid())
+  projectId       String
+  beneficiaryId   String
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  beneficiary     Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  status          String      @default("active")
+  notes           String?
+  enrolledAt      DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  clientUpdatedAt DateTime?
+
+  @@unique([projectId, beneficiaryId])
+  @@index([beneficiaryId])
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  description String?
+  hours       Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  cohorts     Cohort[]
+
+  @@unique([projectId, code])
+}
+
+model Cohort {
+  id          String    @id @default(cuid())
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name        String
+  startDate   DateTime
+  endDate     DateTime?
+  capacity    Int?
+  location    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  enrollments CohortEnrollment[]
+  sessions    Session[]
+
+  @@index([courseId])
+}
+
+model CohortEnrollment {
+  id            String      @id @default(cuid())
+  cohortId      String
+  beneficiaryId String
+  cohort        Cohort      @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  status        String      @default("active")
+  enrolledAt    DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([cohortId, beneficiaryId])
+  @@index([beneficiaryId])
+}
+
+model Session {
+  id            String    @id @default(cuid())
+  cohortId      String
+  cohort        Cohort    @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  title         String
+  scheduledAt   DateTime
+  durationMin   Int       @default(60)
+  location      String?
+  facilitatorId String?
+  facilitator   User?     @relation("Facilitator", fields: [facilitatorId], references: [id])
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  attendance    AttendanceRecord[]
+
+  @@index([cohortId])
+  @@index([scheduledAt])
+}
+
+model AttendanceRecord {
+  id            String           @id @default(cuid())
+  sessionId     String
+  beneficiaryId String
+  session       Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  beneficiary   Beneficiary      @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  status        AttendanceStatus
+  note          String?
+  takenById     String?
+  takenBy       User?            @relation("TakenBy", fields: [takenById], references: [id])
+  recordedAt    DateTime         @default(now())
+  source        String           @default("server")
+  clientId      String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([sessionId, beneficiaryId])
+  @@index([beneficiaryId])
+}
+
+model Activity {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  scheduledAt DateTime?
+  location    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  logs        ParticipationLog[]
+
+  @@index([projectId])
+}
+
+model ParticipationLog {
+  id            String      @id @default(cuid())
+  activityId    String
+  beneficiaryId String
+  activity      Activity    @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  participated  Boolean     @default(true)
+  note          String?
+  loggedAt      DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([activityId, beneficiaryId])
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id])
+  action     AuditAction
+  entityType String
+  entityId   String
+  summary    String
+  changes    Json?
+  createdAt  DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+model SyncConflict {
+  id            String    @id @default(cuid())
+  entityType    String
+  entityKey     String
+  rule          String
+  message       String
+  localPayload  Json
+  serverPayload Json?
+  status        String    @default("pending")
+  userId        String?
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+  resolvedById  String?
+
+  @@index([status, createdAt])
+  @@index([entityKey])
+}
