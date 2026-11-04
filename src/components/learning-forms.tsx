@@ -11,7 +11,6 @@ import { activitySchema, cohortSchema, courseSchema, sessionSchema } from "@/lib
 import { createActivity, createCohort, createCourse, createSession, enrollBeneficiary } from "@/server/mutations";
 import { Button } from "@/components/ui/button";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
-import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/chrome";
 import type { z } from "zod";
