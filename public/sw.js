@@ -1,5 +1,5 @@
-const CACHE = "ht-impact-v2";
-const STATIC_CACHE = "ht-impact-static-v2";
+const CACHE = "ht-impact-v3";
+const STATIC_CACHE = "ht-impact-static-v3";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -22,6 +22,8 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
+  // Do not persist sensitive server-rendered pages or user-specific responses in Cache Storage.
+  const isPublicAsset = url.pathname === "/manifest.webmanifest" || url.pathname.startsWith("/icons/") || url.pathname === "/offline.html";
 
   // Cache immutable Next.js build assets so previously visited screens can render offline.
   // Never cache Next.js dynamic responses, authentication data, or RSC flight payloads.
@@ -41,24 +43,22 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(async () => (await caches.match(request)) || (await caches.match("/offline.html"))),
+      fetch(request).catch(async () => (await caches.match("/offline.html")) || Response.error()),
     );
     return;
   }
 
+  if (!isPublicAsset) return;
+
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy));
-        return response;
-      })
-      .catch(() => caches.match(request)),
+    caches.match(request).then(async (cached) => {
+      if (cached) return cached;
+      const response = await fetch(request);
+      if (response.ok) {
+        const cache = await caches.open(CACHE);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    }),
   );
 });
