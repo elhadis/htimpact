@@ -22,7 +22,7 @@ import {
 import { Link, usePathname } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
-import { syncQueued, saveParticipation } from "@/server/mutations";
+import { syncQueued, saveParticipation, enrollBeneficiary } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -63,12 +63,13 @@ export function AppShell({
   const syncInProgress = useRef(false);
 
   async function refreshQueue() {
-    const [attendance, assignments, participation] = await Promise.all([
+    const [attendance, assignments, participation, enrollments] = await Promise.all([
       offlineDb.attendanceQueue.count(),
       offlineDb.assignmentQueue.count(),
       offlineDb.participationQueue.count(),
+      offlineDb.enrollmentQueue.count(),
     ]);
-    setQueued(attendance + assignments + participation);
+    setQueued(attendance + assignments + participation + enrollments);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
   }
@@ -79,18 +80,20 @@ export function AppShell({
     let attendance: Awaited<ReturnType<typeof offlineDb.attendanceQueue.toArray>>;
     let assignments: Awaited<ReturnType<typeof offlineDb.assignmentQueue.toArray>>;
     let participation: Awaited<ReturnType<typeof offlineDb.participationQueue.toArray>>;
+    let enrollments: Awaited<ReturnType<typeof offlineDb.enrollmentQueue.toArray>>;
     try {
-      [attendance, assignments, participation] = await Promise.all([
+      [attendance, assignments, participation, enrollments] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
         offlineDb.assignmentQueue.toArray(),
         offlineDb.participationQueue.toArray(),
+        offlineDb.enrollmentQueue.toArray(),
       ]);
     } catch {
       syncInProgress.current = false;
       toast.error(t("errors.syncFailed"));
       return;
     }
-    if (attendance.length + assignments.length + participation.length === 0) {
+    if (attendance.length + assignments.length + participation.length + enrollments.length === 0) {
       syncInProgress.current = false;
       return;
     }
@@ -112,9 +115,15 @@ export function AppShell({
         if (saved.ok) await offlineDb.participationQueue.delete(mutation.clientMutationId);
         else participationFailed++;
       }
+      let enrollmentFailed = 0;
+      for (const mutation of enrollments) {
+        const saved = await enrollBeneficiary({ cohortId: mutation.cohortId, beneficiaryId: mutation.beneficiaryId });
+        if (saved.ok) await offlineDb.enrollmentQueue.delete(mutation.clientMutationId);
+        else enrollmentFailed++;
+      }
       const conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
       const rejected = [...result.attendance, ...result.assignments].filter((row) => row.result === "rejected").length;
-      if (participationFailed || rejected) toast.error(t("errors.syncFailed"));
+      if (participationFailed || enrollmentFailed || rejected) toast.error(t("errors.syncFailed"));
       else toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
     } catch {
       toast.error(t("errors.syncFailed"));
