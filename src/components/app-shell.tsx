@@ -72,7 +72,7 @@ export function AppShell({
   }
 
   async function flush() {
-    if (queueModeEnabled()) return;
+    if (!navigator.onLine) return;
     const [attendance, assignments] = await Promise.all([
       offlineDb.attendanceQueue.toArray(),
       offlineDb.assignmentQueue.toArray(),
@@ -88,8 +88,8 @@ export function AppShell({
         toast.error(t("errors.syncFailed"));
         return;
       }
-      await offlineDb.attendanceQueue.bulkDelete(attendance.map((row) => row.clientMutationId));
-      await offlineDb.assignmentQueue.bulkDelete(assignments.map((row) => row.clientMutationId));
+      await offlineDb.attendanceQueue.bulkDelete(result.attendance.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
+      await offlineDb.assignmentQueue.bulkDelete(result.assignments.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
       const conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
       toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
     } catch {
@@ -102,11 +102,10 @@ export function AppShell({
 
   useEffect(() => {
     const boot = window.setTimeout(() => {
-      void refreshQueue().then(() => flush());
+      void refreshQueue();
     }, 0);
     const onOnline = () => {
       setOnline(true);
-      void flush();
     };
     const onOffline = () => setOnline(false);
     window.addEventListener("online", onOnline);
@@ -126,7 +125,7 @@ export function AppShell({
     const next = !queueMode;
     localStorage.setItem("ht-queue-mode", next ? "1" : "0");
     setQueueMode(next);
-    if (!next) void flush();
+
   }
 
   const nav = (
@@ -197,7 +196,7 @@ export function AppShell({
               {queued > 0 ? <span className="font-semibold text-primary">{queued}</span> : null}
             </button>
             {queued > 0 ? (
-              <Button type="button" size="sm" variant="teal" onClick={() => void flush()} disabled={syncing || queueMode || !online}>
+              <Button type="button" size="sm" variant="teal" onClick={() => void flush()} disabled={syncing || !online}>
                 {t("common.syncNow")}
               </Button>
             ) : null}
