@@ -1,6 +1,7 @@
 "use client";
 
 import Dexie, { type Table } from "dexie";
+import type { ProjectInput } from "@/lib/validators";
 
 export type QueuedAttendance = {
   clientMutationId: string;
@@ -31,6 +32,8 @@ export type QueuedParticipation = {
   rows: { beneficiaryId: string; participated: boolean }[];
 };
 
+export type QueuedProject = { clientMutationId: string; values: ProjectInput };
+
 export type QueuedCourse = {
   clientMutationId: string;
   values: { projectId: string; code: string; name: string; description?: string; hours?: string | number };
@@ -55,6 +58,7 @@ class ImpactDB extends Dexie {
   participationQueue!: Table<QueuedParticipation, string>;
   enrollmentQueue!: Table<QueuedEnrollment, string>;
   courseQueue!: Table<QueuedCourse, string>;
+  projectQueue!: Table<QueuedProject, string>;
 
   constructor() {
     super("ht-impact-manager");
@@ -83,6 +87,15 @@ class ImpactDB extends Dexie {
       participationQueue: "clientMutationId, activityId",
       enrollmentQueue: "clientMutationId, cohortId, beneficiaryId",
       courseQueue: "clientMutationId, values.projectId",
+    });
+    this.version(5).stores({
+      attendanceQueue: "clientMutationId, sessionId, beneficiaryId",
+      assignmentQueue: "clientMutationId, projectId, beneficiaryId",
+      rosters: "sessionId",
+      participationQueue: "clientMutationId, activityId",
+      enrollmentQueue: "clientMutationId, cohortId, beneficiaryId",
+      courseQueue: "clientMutationId, values.projectId",
+      projectQueue: "clientMutationId",
     });
   }
 }
