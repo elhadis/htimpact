@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { signOut } from "next-auth/react";
 import {
@@ -60,6 +60,7 @@ export function AppShell({
   const [queued, setQueued] = useState(0);
   const [queueMode, setQueueMode] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const syncInProgress = useRef(false);
 
   async function refreshQueue() {
     const [attendance, assignments, participation] = await Promise.all([
@@ -73,13 +74,17 @@ export function AppShell({
   }
 
   async function flush() {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || syncInProgress.current) return;
+    syncInProgress.current = true;
     const [attendance, assignments] = await Promise.all([
       offlineDb.attendanceQueue.toArray(),
       offlineDb.assignmentQueue.toArray(),
       offlineDb.participationQueue.toArray(),
     ]);
-    if (attendance.length + assignments.length + participation.length === 0) return;
+    if (attendance.length + assignments.length + participation.length === 0) {
+      syncInProgress.current = false;
+      return;
+    }
     setSyncing(true);
     try {
       const result = await syncQueued({
@@ -92,15 +97,20 @@ export function AppShell({
       }
       await offlineDb.attendanceQueue.bulkDelete(result.attendance.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
       await offlineDb.assignmentQueue.bulkDelete(result.assignments.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
+      let participationFailed = 0;
       for (const mutation of participation) {
         const saved = await saveParticipation({ activityId: mutation.activityId, rows: mutation.rows });
         if (saved.ok) await offlineDb.participationQueue.delete(mutation.clientMutationId);
+        else participationFailed++;
       }
       const conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
-      toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
+      const rejected = [...result.attendance, ...result.assignments].filter((row) => row.result === "rejected").length;
+      if (participationFailed || rejected) toast.error(t("errors.syncFailed"));
+      else toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
     } catch {
       toast.error(t("errors.syncFailed"));
     } finally {
+      syncInProgress.current = false;
       setSyncing(false);
       await refreshQueue();
     }
