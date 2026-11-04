@@ -11,9 +11,10 @@ export function PendingOfflineChanges({ locale }: { locale: string }) {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [attendance, assignments] = await Promise.all([
+      const [attendance, assignments, participation] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
         offlineDb.assignmentQueue.toArray(),
+        offlineDb.participationQueue.toArray(),
       ]);
       if (!active) return;
       setItems([
@@ -21,6 +22,11 @@ export function PendingOfflineChanges({ locale }: { locale: string }) {
           id: row.clientMutationId,
           type: locale === "ar" ? "حضور" : "Attendance",
           detail: row.beneficiaryName,
+        })),
+        ...participation.map((row) => ({
+          id: row.clientMutationId,
+          type: locale === "ar" ? "مشاركة نشاط" : "Activity participation",
+          detail: row.activityId + " (" + row.rows.length + ")",
         })),
         ...assignments.map((row) => ({
           id: row.clientMutationId,
