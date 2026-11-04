@@ -333,6 +333,10 @@ export async function createCohort(input: unknown) {
   const access = await guard("cohorts", "create");
   if (!access.ok) return fail(access.error);
   const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
+  if (mutationId) {
+    const existing = await prisma.cohort.findUnique({ where: { id: mutationId } });
+    if (existing) return { ok: true as const, id: existing.id };
+  }
   const parsed = cohortSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const course = await prisma.course.findUnique({ where: { id: parsed.data.courseId } });
@@ -361,7 +365,6 @@ export async function createCohort(input: unknown) {
       throw error;
     }
   })();
-  if (mutationId && cohort.createdAt && cohort.updatedAt && cohort.createdAt.getTime() !== cohort.updatedAt.getTime()) { /* existing record remains authoritative */ }
   await writeAudit({
     userId: access.session.user.id,
     action: "CREATE",
@@ -429,6 +432,10 @@ export async function createSession(input: unknown) {
   const access = await guard("sessions", "create");
   if (!access.ok) return fail(access.error);
   const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
+  if (mutationId) {
+    const existing = await prisma.session.findUnique({ where: { id: mutationId } });
+    if (existing) return { ok: true as const, id: existing.id };
+  }
   const parsed = sessionSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const cohort = await prisma.cohort.findUnique({
@@ -458,7 +465,6 @@ export async function createSession(input: unknown) {
       throw error;
     }
   })();
-  if (mutationId && session.createdAt && session.updatedAt && session.createdAt.getTime() !== session.updatedAt.getTime()) { /* existing record remains authoritative */ }
   await writeAudit({
     userId: access.session.user.id,
     action: "CREATE",
@@ -534,6 +540,10 @@ export async function createActivity(input: unknown) {
   const access = await guard("activities", "create");
   if (!access.ok) return fail(access.error);
   const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
+  if (mutationId) {
+    const existing = await prisma.activity.findUnique({ where: { id: mutationId } });
+    if (existing) return { ok: true as const, id: existing.id };
+  }
   const parsed = activitySchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const project = await prisma.project.findUnique({ where: { id: parsed.data.projectId } });
@@ -559,7 +569,6 @@ export async function createActivity(input: unknown) {
       throw error;
     }
   })();
-  if (mutationId && activity.createdAt && activity.updatedAt && activity.createdAt.getTime() !== activity.updatedAt.getTime()) { /* existing record remains authoritative */ }
   await writeAudit({
     userId: access.session.user.id,
     action: "CREATE",
