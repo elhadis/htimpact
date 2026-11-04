@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
-import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
+import { offlineDb, queueModeEnabled, type QueuedAttendance, type QueuedAssignment, type QueuedParticipation, type QueuedEnrollment, type QueuedCourse, type QueuedProject, type QueuedBeneficiary } from "@/lib/offline/db";
 import { syncQueued, saveParticipation, enrollBeneficiary, createCourse, createProject, createBeneficiary } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
@@ -80,13 +80,13 @@ export function AppShell({
   async function flush() {
     if (!navigator.onLine || syncInProgress.current) return;
     syncInProgress.current = true;
-    let attendance: Awaited<ReturnType<typeof offlineDb.attendanceQueue.toArray>>;
-    let assignments: Awaited<ReturnType<typeof offlineDb.assignmentQueue.toArray>>;
-    let participation: Awaited<ReturnType<typeof offlineDb.participationQueue.toArray>>;
-    let enrollments: Awaited<ReturnType<typeof offlineDb.enrollmentQueue.toArray>>;
-    let courses: Awaited<ReturnType<typeof offlineDb.courseQueue.toArray>>;
-    let projects: Awaited<ReturnType<typeof offlineDb.projectQueue.toArray>>;
-    let beneficiaries: Awaited<ReturnType<typeof offlineDb.beneficiaryQueue.toArray>>;
+    let attendance: QueuedAttendance[];
+    let assignments: QueuedAssignment[];
+    let participation: QueuedParticipation[];
+    let enrollments: QueuedEnrollment[];
+    let courses: QueuedCourse[];
+    let projects: QueuedProject[];
+    let beneficiaries: QueuedBeneficiary[];
     try {
       [attendance, assignments, participation, enrollments, courses, projects, beneficiaries] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
