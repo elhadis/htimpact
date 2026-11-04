@@ -22,7 +22,7 @@ import {
 import { Link, usePathname } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
-import { syncQueued, saveParticipation, enrollBeneficiary } from "@/server/mutations";
+import { syncQueued, saveParticipation, enrollBeneficiary, createCourse } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -63,13 +63,14 @@ export function AppShell({
   const syncInProgress = useRef(false);
 
   async function refreshQueue() {
-    const [attendance, assignments, participation, enrollments] = await Promise.all([
+    const [attendance, assignments, participation, enrollments, courses] = await Promise.all([
       offlineDb.attendanceQueue.count(),
       offlineDb.assignmentQueue.count(),
       offlineDb.participationQueue.count(),
       offlineDb.enrollmentQueue.count(),
+      offlineDb.courseQueue.count(),
     ]);
-    setQueued(attendance + assignments + participation + enrollments);
+    setQueued(attendance + assignments + participation + enrollments + courses);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
   }
@@ -81,19 +82,21 @@ export function AppShell({
     let assignments: Awaited<ReturnType<typeof offlineDb.assignmentQueue.toArray>>;
     let participation: Awaited<ReturnType<typeof offlineDb.participationQueue.toArray>>;
     let enrollments: Awaited<ReturnType<typeof offlineDb.enrollmentQueue.toArray>>;
+    let courses: Awaited<ReturnType<typeof offlineDb.courseQueue.toArray>>;
     try {
-      [attendance, assignments, participation, enrollments] = await Promise.all([
+      [attendance, assignments, participation, enrollments, courses] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
         offlineDb.assignmentQueue.toArray(),
         offlineDb.participationQueue.toArray(),
         offlineDb.enrollmentQueue.toArray(),
+        offlineDb.courseQueue.toArray(),
       ]);
     } catch {
       syncInProgress.current = false;
       toast.error(t("errors.syncFailed"));
       return;
     }
-    if (attendance.length + assignments.length + participation.length + enrollments.length === 0) {
+    if (attendance.length + assignments.length + participation.length + enrollments.length + courses.length === 0) {
       syncInProgress.current = false;
       return;
     }
@@ -133,6 +136,15 @@ export function AppShell({
         try {
           const saved = await enrollBeneficiary({ cohortId: mutation.cohortId, beneficiaryId: mutation.beneficiaryId });
           if (saved.ok) await offlineDb.enrollmentQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
+      }
+      for (const mutation of courses) {
+        try {
+          const saved = await createCourse(mutation.values);
+          if (saved.ok) await offlineDb.courseQueue.delete(mutation.clientMutationId);
           else failed = true;
         } catch {
           failed = true;
