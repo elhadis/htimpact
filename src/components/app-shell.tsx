@@ -143,7 +143,7 @@ export function AppShell({
       }
       for (const mutation of courses) {
         try {
-          const saved = await createCourse(mutation.values);
+          const saved = await createCourse({ ...mutation.values, clientMutationId: mutation.clientMutationId });
           if (saved.ok) await offlineDb.courseQueue.delete(mutation.clientMutationId);
           else failed = true;
         } catch {
