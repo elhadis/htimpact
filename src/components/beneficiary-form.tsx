@@ -10,6 +10,7 @@ import { useRouter } from "@/i18n/navigation";
 import { beneficiarySchema, genders, type BeneficiaryInput } from "@/lib/validators";
 import { createBeneficiary, updateBeneficiary } from "@/server/mutations";
 import { Button } from "@/components/ui/button";
+import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/chrome";
@@ -35,8 +36,35 @@ export function BeneficiaryForm({
 
   async function onSubmit(values: BeneficiaryInput) {
     const payload = { ...values, projectIds: selected };
-    const result =
-      mode === "create" ? await createBeneficiary(payload) : await updateBeneficiary(beneficiaryId ?? "", payload);
+    if (mode === "create") {
+      const pending = { clientMutationId: crypto.randomUUID(), values: payload };
+      const queue = async () => {
+        try {
+          await offlineDb.beneficiaryQueue.put(pending);
+          toast.success(t("common.saved"));
+        } catch {
+          toast.error(t("errors.syncFailed"));
+        }
+      };
+      if (queueModeEnabled()) {
+        await queue();
+        return;
+      }
+      try {
+        const result = await createBeneficiary(payload);
+        if (!result.ok) {
+          toast.error(t(`errors.${result.error}`));
+          return;
+        }
+        toast.success(t("common.saved"));
+        router.push(`/beneficiaries/${result.id}`);
+        router.refresh();
+      } catch {
+        await queue();
+      }
+      return;
+    }
+    const result = await updateBeneficiary(beneficiaryId ?? "", payload);
     if (!result.ok) {
       toast.error(t(`errors.${result.error}`));
       return;
