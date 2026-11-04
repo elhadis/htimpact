@@ -10,6 +10,7 @@ import { useRouter } from "@/i18n/navigation";
 import { activitySchema, cohortSchema, courseSchema, sessionSchema } from "@/lib/validators";
 import { createActivity, createCohort, createCourse, createSession, enrollBeneficiary } from "@/server/mutations";
 import { Button } from "@/components/ui/button";
+import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/chrome";
 import type { z } from "zod";
@@ -240,7 +241,32 @@ export function EnrollForm({
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setPending(true);
-    const result = await enrollBeneficiary({ cohortId, beneficiaryId });
+    const pendingEnrollment = { clientMutationId: crypto.randomUUID(), cohortId, beneficiaryId };
+    if (queueModeEnabled()) {
+      try {
+        await offlineDb.enrollmentQueue.put(pendingEnrollment);
+        toast.success(t("common.saved"));
+      } catch {
+        toast.error(t("errors.syncFailed"));
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
+    let result: Awaited<ReturnType<typeof enrollBeneficiary>>;
+    try {
+      result = await enrollBeneficiary({ cohortId, beneficiaryId });
+    } catch {
+      try {
+        await offlineDb.enrollmentQueue.put(pendingEnrollment);
+        toast.success(t("common.saved"));
+      } catch {
+        toast.error(t("errors.syncFailed"));
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
     setPending(false);
     if (!result.ok) {
       toast.error(t(`errors.${result.error}`));
