@@ -105,8 +105,25 @@ export function CohortForm({ courses }: { courses: { id: string; name: string; p
     <form
       className="grid gap-4 sm:grid-cols-2"
       onSubmit={form.handleSubmit(async (values) => {
-        const result = await createCohort(values);
-        done(result, `/cohorts/${result.ok ? result.id : ""}`);
+        const pending = { clientMutationId: crypto.randomUUID(), values };
+        const queue = async () => {
+          try {
+            await offlineDb.cohortQueue.put(pending);
+            toast.success(t("common.saved"));
+          } catch {
+            toast.error(t("errors.syncFailed"));
+          }
+        };
+        if (queueModeEnabled()) {
+          await queue();
+          return;
+        }
+        try {
+          const result = await createCohort(values);
+          done(result, `/cohorts/${result.ok ? result.id : ""}`);
+        } catch {
+          await queue();
+        }
       })}
     >
       <Field label={t("learning.course")} className="sm:col-span-2">
@@ -164,8 +181,25 @@ export function SessionForm({
     <form
       className="grid gap-4 sm:grid-cols-2"
       onSubmit={form.handleSubmit(async (values) => {
-        const result = await createSession(values);
-        done(result, `/attendance/${result.ok ? result.id : ""}`);
+        const pending = { clientMutationId: crypto.randomUUID(), values };
+        const queue = async () => {
+          try {
+            await offlineDb.sessionQueue.put(pending);
+            toast.success(t("common.saved"));
+          } catch {
+            toast.error(t("errors.syncFailed"));
+          }
+        };
+        if (queueModeEnabled()) {
+          await queue();
+          return;
+        }
+        try {
+          const result = await createSession(values);
+          done(result, `/attendance/${result.ok ? result.id : ""}`);
+        } catch {
+          await queue();
+        }
       })}
     >
       <Field label={t("learning.cohort")} className="sm:col-span-2">
@@ -219,8 +253,25 @@ export function ActivityForm({ projectId }: { projectId: string }) {
     <form
       className="grid gap-4 sm:grid-cols-2"
       onSubmit={form.handleSubmit(async (values) => {
-        const result = await createActivity(values);
-        done(result, `/projects/${projectId}`);
+        const pending = { clientMutationId: crypto.randomUUID(), values };
+        const queue = async () => {
+          try {
+            await offlineDb.activityQueue.put(pending);
+            toast.success(t("common.saved"));
+          } catch {
+            toast.error(t("errors.syncFailed"));
+          }
+        };
+        if (queueModeEnabled()) {
+          await queue();
+          return;
+        }
+        try {
+          const result = await createActivity(values);
+          done(result, `/projects/${projectId}`);
+        } catch {
+          await queue();
+        }
       })}
     >
       <Field label={t("learning.activityName")}>
