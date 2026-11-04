@@ -99,31 +99,46 @@ export function AppShell({
     }
     setSyncing(true);
     try {
-      const result = await syncQueued({
-        attendance: attendance.map((row) => ({ ...row, source: "offline" as const })),
-        assignments,
-      });
-      if (!result.ok) {
-        toast.error(t("errors.syncFailed"));
-        return;
+      let conflicts = 0;
+      let rejected = 0;
+      let failed = false;
+      if (attendance.length || assignments.length) {
+        try {
+          const result = await syncQueued({
+            attendance: attendance.map((row) => ({ ...row, source: "offline" as const })),
+            assignments,
+          });
+          if (result.ok) {
+            await offlineDb.attendanceQueue.bulkDelete(result.attendance.filter((row) => ["applied", "noop", "conflict"].includes(row.result)).map((row) => row.clientMutationId));
+            await offlineDb.assignmentQueue.bulkDelete(result.assignments.filter((row) => ["applied", "noop", "conflict"].includes(row.result)).map((row) => row.clientMutationId));
+            conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
+            rejected = [...result.attendance, ...result.assignments].filter((row) => row.result === "rejected").length;
+          } else {
+            failed = true;
+          }
+        } catch {
+          failed = true;
+        }
       }
-      await offlineDb.attendanceQueue.bulkDelete(result.attendance.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
-      await offlineDb.assignmentQueue.bulkDelete(result.assignments.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
-      let participationFailed = 0;
       for (const mutation of participation) {
-        const saved = await saveParticipation({ activityId: mutation.activityId, rows: mutation.rows });
-        if (saved.ok) await offlineDb.participationQueue.delete(mutation.clientMutationId);
-        else participationFailed++;
+        try {
+          const saved = await saveParticipation({ activityId: mutation.activityId, rows: mutation.rows });
+          if (saved.ok) await offlineDb.participationQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
       }
-      let enrollmentFailed = 0;
       for (const mutation of enrollments) {
-        const saved = await enrollBeneficiary({ cohortId: mutation.cohortId, beneficiaryId: mutation.beneficiaryId });
-        if (saved.ok) await offlineDb.enrollmentQueue.delete(mutation.clientMutationId);
-        else enrollmentFailed++;
+        try {
+          const saved = await enrollBeneficiary({ cohortId: mutation.cohortId, beneficiaryId: mutation.beneficiaryId });
+          if (saved.ok) await offlineDb.enrollmentQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
       }
-      const conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
-      const rejected = [...result.attendance, ...result.assignments].filter((row) => row.result === "rejected").length;
-      if (participationFailed || enrollmentFailed || rejected) toast.error(t("errors.syncFailed"));
+      if (failed || rejected) toast.error(t("errors.syncFailed"));
       else toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
     } catch {
       toast.error(t("errors.syncFailed"));
