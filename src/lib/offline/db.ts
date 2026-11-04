@@ -25,6 +25,12 @@ export type QueuedAssignment = {
   baseNotes: string | null;
 };
 
+export type QueuedParticipation = {
+  clientMutationId: string;
+  activityId: string;
+  rows: { beneficiaryId: string; participated: boolean }[];
+};
+
 export type CachedRoster = {
   sessionId: string;
   updatedAt: string;
@@ -35,6 +41,7 @@ class ImpactDB extends Dexie {
   attendanceQueue!: Table<QueuedAttendance, string>;
   assignmentQueue!: Table<QueuedAssignment, string>;
   rosters!: Table<CachedRoster, string>;
+  participationQueue!: Table<QueuedParticipation, string>;
 
   constructor() {
     super("ht-impact-manager");
@@ -42,6 +49,12 @@ class ImpactDB extends Dexie {
       attendanceQueue: "clientMutationId, sessionId, beneficiaryId",
       assignmentQueue: "clientMutationId, projectId, beneficiaryId",
       rosters: "sessionId",
+    });
+    this.version(2).stores({
+      attendanceQueue: "clientMutationId, sessionId, beneficiaryId",
+      assignmentQueue: "clientMutationId, projectId, beneficiaryId",
+      rosters: "sessionId",
+      participationQueue: "clientMutationId, activityId",
     });
   }
 }
