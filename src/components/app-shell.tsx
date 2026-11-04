@@ -22,7 +22,7 @@ import {
 import { Link, usePathname } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
-import { syncQueued } from "@/server/mutations";
+import { syncQueued, saveParticipation } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -62,11 +62,12 @@ export function AppShell({
   const [syncing, setSyncing] = useState(false);
 
   async function refreshQueue() {
-    const [attendance, assignments] = await Promise.all([
+    const [attendance, assignments, participation] = await Promise.all([
       offlineDb.attendanceQueue.count(),
       offlineDb.assignmentQueue.count(),
+      offlineDb.participationQueue.count(),
     ]);
-    setQueued(attendance + assignments);
+    setQueued(attendance + assignments + participation);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
   }
@@ -76,8 +77,9 @@ export function AppShell({
     const [attendance, assignments] = await Promise.all([
       offlineDb.attendanceQueue.toArray(),
       offlineDb.assignmentQueue.toArray(),
+      offlineDb.participationQueue.toArray(),
     ]);
-    if (attendance.length + assignments.length === 0) return;
+    if (attendance.length + assignments.length + participation.length === 0) return;
     setSyncing(true);
     try {
       const result = await syncQueued({
@@ -90,6 +92,10 @@ export function AppShell({
       }
       await offlineDb.attendanceQueue.bulkDelete(result.attendance.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
       await offlineDb.assignmentQueue.bulkDelete(result.assignments.filter((row) => row.result === "applied" || row.result === "noop" || row.result === "conflict").map((row) => row.clientMutationId));
+      for (const mutation of participation) {
+        const saved = await saveParticipation({ activityId: mutation.activityId, rows: mutation.rows });
+        if (saved.ok) await offlineDb.participationQueue.delete(mutation.clientMutationId);
+      }
       const conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
       toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
     } catch {
