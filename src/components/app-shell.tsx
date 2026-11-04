@@ -74,7 +74,7 @@ export function AppShell({
       offlineDb.cohortQueue.count(),
       offlineDb.sessionQueue.count(),
       offlineDb.activityQueue.count(),
-    ]);
+    ]) as [number, number, number, number, number, number, number, number, number, number];
     setQueued(attendance + assignments + participation + enrollments + courses + projects + beneficiaries + cohorts + sessions + activities);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
@@ -105,7 +105,7 @@ export function AppShell({
         offlineDb.cohortQueue.toArray(),
         offlineDb.sessionQueue.toArray(),
         offlineDb.activityQueue.toArray(),
-      ]);
+      ]) as [QueuedAttendance[], QueuedAssignment[], QueuedParticipation[], QueuedEnrollment[], QueuedCourse[], QueuedProject[], QueuedBeneficiary[], QueuedCohort[], QueuedSession[], QueuedActivity[]];
     } catch {
       syncInProgress.current = false;
       toast.error(t("errors.syncFailed"));
