@@ -8,7 +8,7 @@ import { isAppRole, type AppRole } from "@/lib/rbac";
 import { loginSchema } from "@/lib/validators";
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt", maxAge: 60 * 60 * 12 },
+  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
   secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
   pages: {},
   providers: [
