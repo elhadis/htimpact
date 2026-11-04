@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/chrome";
 import { Forbidden } from "@/components/forbidden";
 import { EnumBadge } from "@/components/enum-badge";
 import { ConflictActions } from "@/components/conflict-actions";
+import { PendingOfflineChanges } from "@/components/pending-offline-changes";
 
 export default async function SyncPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -22,6 +23,7 @@ export default async function SyncPage({ params }: { params: Promise<{ locale: s
   return (
     <div className="space-y-8">
       <PageHeader title={t("sync.title")} description={t("sync.intro")} />
+      <PendingOfflineChanges locale={locale} />
       <section className="rounded-xl border bg-card p-5">
         <h2 className="font-semibold">{t("sync.rulesTitle")}</h2>
         <ol className="mt-3 list-decimal space-y-2 ps-5 text-sm leading-6 text-muted-foreground">
