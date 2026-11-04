@@ -144,10 +144,15 @@ export async function updateProject(id: string, input: unknown) {
 export async function createBeneficiary(input: unknown) {
   const access = await guard("beneficiaries", "create");
   if (!access.ok) return fail(access.error);
+  const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
   const parsed = beneficiarySchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const data = parsed.data;
   const nationalId = emptyToNull(data.nationalId);
+  if (mutationId) {
+    const prior = await prisma.beneficiary.findUnique({ where: { id: mutationId } });
+    if (prior) return { ok: true as const, id: prior.id };
+  }
   if (nationalId) {
     const existing = await prisma.beneficiary.findUnique({ where: { nationalId } });
     if (existing) return fail("duplicatePerson");
@@ -155,6 +160,7 @@ export async function createBeneficiary(input: unknown) {
   try {
     const person = await prisma.beneficiary.create({
       data: {
+        ...(mutationId ? { id: mutationId } : {}),
         code: await nextBeneficiaryCode(),
         firstName: data.firstName,
         lastName: data.lastName,
@@ -179,7 +185,13 @@ export async function createBeneficiary(input: unknown) {
     refresh(["/dashboard", "/beneficiaries", `/beneficiaries/${person.id}`, "/projects"]);
     return { ok: true as const, id: person.id };
   } catch (error) {
-    if (isUniqueConflict(error)) return fail("duplicatePerson");
+    if (isUniqueConflict(error)) {
+      if (mutationId) {
+        const prior = await prisma.beneficiary.findUnique({ where: { id: mutationId } });
+        if (prior) return { ok: true as const, id: prior.id };
+      }
+      return fail("duplicatePerson");
+    }
     throw error;
   }
 }
