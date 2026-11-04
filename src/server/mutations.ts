@@ -56,6 +56,7 @@ async function nextBeneficiaryCode() {
 export async function createProject(input: unknown) {
   const access = await guard("projects", "create");
   if (!access.ok) return fail(access.error);
+  const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
   const parsed = projectSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const data = parsed.data;
@@ -64,6 +65,7 @@ export async function createProject(input: unknown) {
   try {
     const project = await prisma.project.create({
       data: {
+        ...(mutationId ? { id: mutationId } : {}),
         code: data.code.toUpperCase(),
         name: data.name,
         description: emptyToNull(data.description),
@@ -86,7 +88,13 @@ export async function createProject(input: unknown) {
     refresh(["/dashboard", "/projects", `/projects/${project.id}`, "/reports"]);
     return { ok: true as const, id: project.id };
   } catch (error) {
-    if (isUniqueConflict(error)) return fail("unique");
+    if (isUniqueConflict(error)) {
+      if (mutationId) {
+        const existing = await prisma.project.findUnique({ where: { id: mutationId } });
+        if (existing && existing.code === data.code.toUpperCase() && existing.name === data.name) return { ok: true as const, id: existing.id };
+      }
+      return fail("unique");
+    }
     throw error;
   }
 }
