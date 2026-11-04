@@ -11,6 +11,7 @@ import { activitySchema, cohortSchema, courseSchema, sessionSchema } from "@/lib
 import { createActivity, createCohort, createCourse, createSession, enrollBeneficiary } from "@/server/mutations";
 import { Button } from "@/components/ui/button";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
+import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/chrome";
 import type { z } from "zod";
@@ -47,8 +48,24 @@ export function CourseForm({
     <form
       className="grid gap-4 sm:grid-cols-2"
       onSubmit={form.handleSubmit(async (values) => {
-        const result = await createCourse(values);
-        done(result, `/courses/${result.ok ? result.id : ""}`);
+        const queue = async () => {
+          try {
+            await offlineDb.courseQueue.put({ clientMutationId: crypto.randomUUID(), values });
+            toast.success(t("common.saved"));
+          } catch {
+            toast.error(t("errors.syncFailed"));
+          }
+        };
+        if (queueModeEnabled()) {
+          await queue();
+          return;
+        }
+        try {
+          const result = await createCourse(values);
+          done(result, `/courses/${result.ok ? result.id : ""}`);
+        } catch {
+          await queue();
+        }
       })}
     >
       <Field label={t("learning.project")} className="sm:col-span-2">
