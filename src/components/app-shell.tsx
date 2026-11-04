@@ -76,10 +76,14 @@ export function AppShell({
   async function flush() {
     if (!navigator.onLine || syncInProgress.current) return;
     syncInProgress.current = true;
-    const [attendance, assignments] = await Promise.all([
-      offlineDb.attendanceQueue.toArray(),
-      offlineDb.assignmentQueue.toArray(),
-      offlineDb.participationQueue.toArray(),
+    let attendance: Awaited<ReturnType<typeof offlineDb.attendanceQueue.toArray>>;
+    let assignments: Awaited<ReturnType<typeof offlineDb.assignmentQueue.toArray>>;
+    let participation: Awaited<ReturnType<typeof offlineDb.participationQueue.toArray>>;
+    try {
+      [attendance, assignments, participation] = await Promise.all([
+        offlineDb.attendanceQueue.toArray(),
+        offlineDb.assignmentQueue.toArray(),
+        offlineDb.participationQueue.toArray(),
       ]);
     } catch {
       syncInProgress.current = false;
