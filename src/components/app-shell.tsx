@@ -22,7 +22,7 @@ import {
 import { Link, usePathname } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
-import { syncQueued, saveParticipation, enrollBeneficiary, createCourse, createProject } from "@/server/mutations";
+import { syncQueued, saveParticipation, enrollBeneficiary, createCourse, createProject, createBeneficiary } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -63,15 +63,16 @@ export function AppShell({
   const syncInProgress = useRef(false);
 
   async function refreshQueue() {
-    const [attendance, assignments, participation, enrollments, courses, projects] = await Promise.all([
+    const [attendance, assignments, participation, enrollments, courses, projects, beneficiaries] = await Promise.all([
       offlineDb.attendanceQueue.count(),
       offlineDb.assignmentQueue.count(),
       offlineDb.participationQueue.count(),
       offlineDb.enrollmentQueue.count(),
       offlineDb.courseQueue.count(),
       offlineDb.projectQueue.count(),
+      offlineDb.beneficiaryQueue.count(),
     ]);
-    setQueued(attendance + assignments + participation + enrollments + courses + projects);
+    setQueued(attendance + assignments + participation + enrollments + courses + projects + beneficiaries);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
   }
@@ -85,21 +86,23 @@ export function AppShell({
     let enrollments: Awaited<ReturnType<typeof offlineDb.enrollmentQueue.toArray>>;
     let courses: Awaited<ReturnType<typeof offlineDb.courseQueue.toArray>>;
     let projects: Awaited<ReturnType<typeof offlineDb.projectQueue.toArray>>;
+    let beneficiaries: Awaited<ReturnType<typeof offlineDb.beneficiaryQueue.toArray>>;
     try {
-      [attendance, assignments, participation, enrollments, courses, projects] = await Promise.all([
+      [attendance, assignments, participation, enrollments, courses, projects, beneficiaries] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
         offlineDb.assignmentQueue.toArray(),
         offlineDb.participationQueue.toArray(),
         offlineDb.enrollmentQueue.toArray(),
         offlineDb.courseQueue.toArray(),
         offlineDb.projectQueue.toArray(),
+        offlineDb.beneficiaryQueue.toArray(),
       ]);
     } catch {
       syncInProgress.current = false;
       toast.error(t("errors.syncFailed"));
       return;
     }
-    if (attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length === 0) {
+    if (attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length + beneficiaries.length === 0) {
       syncInProgress.current = false;
       return;
     }
@@ -139,6 +142,15 @@ export function AppShell({
         try {
           const saved = await enrollBeneficiary({ cohortId: mutation.cohortId, beneficiaryId: mutation.beneficiaryId });
           if (saved.ok) await offlineDb.enrollmentQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
+      }
+      for (const mutation of beneficiaries) {
+        try {
+          const saved = await createBeneficiary({ ...mutation.values, clientMutationId: mutation.clientMutationId });
+          if (saved.ok) await offlineDb.beneficiaryQueue.delete(mutation.clientMutationId);
           else failed = true;
         } catch {
           failed = true;
