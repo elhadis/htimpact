@@ -10,6 +10,7 @@ import { projectSchema, projectStatuses, type ProjectInput } from "@/lib/validat
 import { metricsForType } from "@/lib/progress";
 import { createProject, updateProject } from "@/server/mutations";
 import { Button } from "@/components/ui/button";
+import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Field } from "@/components/chrome";
@@ -47,7 +48,35 @@ export function ProjectForm({
   }
 
   async function onSubmit(values: ProjectInput) {
-    const result = mode === "create" ? await createProject(values) : await updateProject(projectId ?? "", values);
+    if (mode === "create") {
+      const pending = { clientMutationId: crypto.randomUUID(), values };
+      const queue = async () => {
+        try {
+          await offlineDb.projectQueue.put(pending);
+          toast.success(t("common.saved"));
+        } catch {
+          toast.error(t("errors.syncFailed"));
+        }
+      };
+      if (queueModeEnabled()) {
+        await queue();
+        return;
+      }
+      try {
+        const result = await createProject(values);
+        if (!result.ok) {
+          toast.error(t.has(`errors.${result.error}`) ? t(`errors.${result.error}`) : t("errors.invalid"));
+          return;
+        }
+        toast.success(t("common.saved"));
+        router.push(`/projects/${result.id}`);
+        router.refresh();
+      } catch {
+        await queue();
+      }
+      return;
+    }
+    const result = await updateProject(projectId ?? "", values);
     if (!result.ok) {
       toast.error(t.has(`errors.${result.error}`) ? t(`errors.${result.error}`) : t("errors.invalid"));
       return;
