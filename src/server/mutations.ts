@@ -269,6 +269,7 @@ export async function assignBeneficiary(input: unknown) {
 export async function createCourse(input: unknown) {
   const access = await guard("courses", "create");
   if (!access.ok) return fail(access.error);
+  const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
   const parsed = courseSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const project = await prisma.project.findUnique({ where: { id: parsed.data.projectId } });
@@ -277,6 +278,7 @@ export async function createCourse(input: unknown) {
   try {
     const course = await prisma.course.create({
       data: {
+        ...(mutationId ? { id: mutationId } : {}),
         projectId: project.id,
         code: parsed.data.code.toUpperCase(),
         name: parsed.data.name,
@@ -294,7 +296,15 @@ export async function createCourse(input: unknown) {
     refresh(["/courses", `/courses/${course.id}`, `/projects/${project.id}`]);
     return { ok: true as const, id: course.id };
   } catch (error) {
-    if (isUniqueConflict(error)) return fail("unique");
+    if (isUniqueConflict(error)) {
+      if (mutationId) {
+        const existing = await prisma.course.findUnique({ where: { id: mutationId } });
+        if (existing && existing.projectId === project.id && existing.code === parsed.data.code.toUpperCase() && existing.name === parsed.data.name) {
+          return { ok: true as const, id: existing.id };
+        }
+      }
+      return fail("unique");
+    }
     throw error;
   }
 }
