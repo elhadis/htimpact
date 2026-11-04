@@ -2,6 +2,8 @@
 
 import Dexie, { type Table } from "dexie";
 import type { ProjectInput, BeneficiaryInput } from "@/lib/validators";
+import type { z } from "zod";
+import { cohortSchema, sessionSchema, activitySchema } from "@/lib/validators";
 
 export type QueuedAttendance = {
   clientMutationId: string;
@@ -31,6 +33,10 @@ export type QueuedParticipation = {
   activityId: string;
   rows: { beneficiaryId: string; participated: boolean }[];
 };
+
+export type QueuedCohort = { clientMutationId: string; values: z.infer<typeof cohortSchema> };
+export type QueuedSession = { clientMutationId: string; values: z.infer<typeof sessionSchema> };
+export type QueuedActivity = { clientMutationId: string; values: z.infer<typeof activitySchema> };
 
 export type QueuedBeneficiary = { clientMutationId: string; values: BeneficiaryInput };
 
@@ -62,6 +68,9 @@ class ImpactDB extends Dexie {
   courseQueue!: Table<QueuedCourse, string>;
   projectQueue!: Table<QueuedProject, string>;
   beneficiaryQueue!: Table<QueuedBeneficiary, string>;
+  cohortQueue!: Table<QueuedCohort, string>;
+  sessionQueue!: Table<QueuedSession, string>;
+  activityQueue!: Table<QueuedActivity, string>;
 
   constructor() {
     super("ht-impact-manager");
@@ -109,6 +118,19 @@ class ImpactDB extends Dexie {
       courseQueue: "clientMutationId, values.projectId",
       projectQueue: "clientMutationId",
       beneficiaryQueue: "clientMutationId",
+    });
+    this.version(7).stores({
+      attendanceQueue: "clientMutationId, sessionId, beneficiaryId",
+      assignmentQueue: "clientMutationId, projectId, beneficiaryId",
+      rosters: "sessionId",
+      participationQueue: "clientMutationId, activityId",
+      enrollmentQueue: "clientMutationId, cohortId, beneficiaryId",
+      courseQueue: "clientMutationId, values.projectId",
+      projectQueue: "clientMutationId",
+      beneficiaryQueue: "clientMutationId",
+      cohortQueue: "clientMutationId",
+      sessionQueue: "clientMutationId",
+      activityQueue: "clientMutationId",
     });
   }
 }
