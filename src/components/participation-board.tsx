@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { saveParticipation } from "@/server/mutations";
+import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -21,17 +22,30 @@ export function ParticipationBoard({
   const [saving, setSaving] = useState(false);
 
   async function onSave() {
-    setSaving(true);
-    const result = await saveParticipation({
+    const payload = {
+      clientMutationId: crypto.randomUUID(),
       activityId,
       rows: marks.map((row) => ({ beneficiaryId: row.beneficiaryId, participated: row.participated })),
-    });
-    setSaving(false);
-    if (!result.ok) {
-      toast.error(t(`errors.${result.error}`));
+    };
+    if (queueModeEnabled()) {
+      await offlineDb.participationQueue.put(payload);
+      toast.success(t("common.saved"));
       return;
     }
-    toast.success(t("common.saved"));
+    setSaving(true);
+    try {
+      const result = await saveParticipation({ activityId, rows: payload.rows });
+      if (!result.ok) {
+        toast.error(t(`errors.${result.error}`));
+        return;
+      }
+      toast.success(t("common.saved"));
+    } catch {
+      await offlineDb.participationQueue.put(payload);
+      toast.success(t("common.saved"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
