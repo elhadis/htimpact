@@ -80,7 +80,12 @@ export function AppShell({
       offlineDb.attendanceQueue.toArray(),
       offlineDb.assignmentQueue.toArray(),
       offlineDb.participationQueue.toArray(),
-    ]);
+      ]);
+    } catch {
+      syncInProgress.current = false;
+      toast.error(t("errors.syncFailed"));
+      return;
+    }
     if (attendance.length + assignments.length + participation.length === 0) {
       syncInProgress.current = false;
       return;
