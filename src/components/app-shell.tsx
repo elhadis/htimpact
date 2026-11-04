@@ -21,8 +21,8 @@ import {
 } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
-import { offlineDb, queueModeEnabled, type QueuedAttendance, type QueuedAssignment, type QueuedParticipation, type QueuedEnrollment, type QueuedCourse, type QueuedProject, type QueuedBeneficiary } from "@/lib/offline/db";
-import { syncQueued, saveParticipation, enrollBeneficiary, createCourse, createProject, createBeneficiary } from "@/server/mutations";
+import { offlineDb, queueModeEnabled, type QueuedAttendance, type QueuedAssignment, type QueuedParticipation, type QueuedEnrollment, type QueuedCourse, type QueuedProject, type QueuedBeneficiary, type QueuedCohort, type QueuedSession, type QueuedActivity } from "@/lib/offline/db";
+import { syncQueued, saveParticipation, enrollBeneficiary, createCourse, createProject, createBeneficiary, createCohort, createSession, createActivity } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -63,7 +63,7 @@ export function AppShell({
   const syncInProgress = useRef(false);
 
   async function refreshQueue() {
-    const [attendance, assignments, participation, enrollments, courses, projects, beneficiaries] = await Promise.all([
+    const [attendance, assignments, participation, enrollments, courses, projects, beneficiaries, cohorts, sessions, activities] = await Promise.all([
       offlineDb.attendanceQueue.count(),
       offlineDb.assignmentQueue.count(),
       offlineDb.participationQueue.count(),
@@ -71,8 +71,11 @@ export function AppShell({
       offlineDb.courseQueue.count(),
       offlineDb.projectQueue.count(),
       offlineDb.beneficiaryQueue.count(),
+      offlineDb.cohortQueue.count(),
+      offlineDb.sessionQueue.count(),
+      offlineDb.activityQueue.count(),
     ]);
-    setQueued(attendance + assignments + participation + enrollments + courses + projects + beneficiaries);
+    setQueued(attendance + assignments + participation + enrollments + courses + projects + beneficiaries + cohorts + sessions + activities);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
   }
@@ -87,8 +90,11 @@ export function AppShell({
     let courses: QueuedCourse[];
     let projects: QueuedProject[];
     let beneficiaries: QueuedBeneficiary[];
+    let cohorts: QueuedCohort[];
+    let sessions: QueuedSession[];
+    let activities: QueuedActivity[];
     try {
-      [attendance, assignments, participation, enrollments, courses, projects, beneficiaries] = await Promise.all([
+      [attendance, assignments, participation, enrollments, courses, projects, beneficiaries, cohorts, sessions, activities] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
         offlineDb.assignmentQueue.toArray(),
         offlineDb.participationQueue.toArray(),
@@ -96,13 +102,16 @@ export function AppShell({
         offlineDb.courseQueue.toArray(),
         offlineDb.projectQueue.toArray(),
         offlineDb.beneficiaryQueue.toArray(),
+        offlineDb.cohortQueue.toArray(),
+        offlineDb.sessionQueue.toArray(),
+        offlineDb.activityQueue.toArray(),
       ]);
     } catch {
       syncInProgress.current = false;
       toast.error(t("errors.syncFailed"));
       return;
     }
-    if (attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length + beneficiaries.length === 0) {
+    if (attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length + beneficiaries.length + cohorts.length + sessions.length + activities.length === 0) {
       syncInProgress.current = false;
       return;
     }
@@ -169,6 +178,33 @@ export function AppShell({
         try {
           const saved = await createCourse({ ...mutation.values, clientMutationId: mutation.clientMutationId });
           if (saved.ok) await offlineDb.courseQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
+      }
+      for (const mutation of cohorts) {
+        try {
+          const saved = await createCohort({ ...mutation.values, clientMutationId: mutation.clientMutationId });
+          if (saved.ok) await offlineDb.cohortQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
+      }
+      for (const mutation of sessions) {
+        try {
+          const saved = await createSession({ ...mutation.values, clientMutationId: mutation.clientMutationId });
+          if (saved.ok) await offlineDb.sessionQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
+      }
+      for (const mutation of activities) {
+        try {
+          const saved = await createActivity({ ...mutation.values, clientMutationId: mutation.clientMutationId });
+          if (saved.ok) await offlineDb.activityQueue.delete(mutation.clientMutationId);
           else failed = true;
         } catch {
           failed = true;
