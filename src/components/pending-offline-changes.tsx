@@ -11,13 +11,14 @@ export function PendingOfflineChanges({ locale }: { locale: string }) {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [attendance, assignments, participation, enrollments, courses, projects] = await Promise.all([
+      const [attendance, assignments, participation, enrollments, courses, projects, beneficiaries] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
         offlineDb.assignmentQueue.toArray(),
         offlineDb.participationQueue.toArray(),
         offlineDb.enrollmentQueue.toArray(),
         offlineDb.courseQueue.toArray(),
         offlineDb.projectQueue.toArray(),
+        offlineDb.beneficiaryQueue.toArray(),
       ]);
       if (!active) return;
       setItems([
@@ -30,6 +31,11 @@ export function PendingOfflineChanges({ locale }: { locale: string }) {
           id: row.clientMutationId,
           type: locale === "ar" ? "مشاركة نشاط" : "Activity participation",
           detail: row.activityId + " (" + row.rows.length + ")",
+        })),
+        ...beneficiaries.map((row) => ({
+          id: row.clientMutationId,
+          type: locale === "ar" ? "تسجيل مستفيد" : "Beneficiary registration",
+          detail: row.values.firstName + " " + row.values.lastName,
         })),
         ...projects.map((row) => ({
           id: row.clientMutationId,
