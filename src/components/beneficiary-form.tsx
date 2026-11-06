@@ -20,11 +20,13 @@ export function BeneficiaryForm({
   beneficiaryId,
   defaults,
   projects,
+  centers = [],
 }: {
   mode: "create" | "edit";
   beneficiaryId?: string;
   defaults: BeneficiaryInput;
   projects: { id: string; name: string; code: string }[];
+  centers?: { id: string; name: string; projects: { projectId: string }[] }[];
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -35,7 +37,8 @@ export function BeneficiaryForm({
   });
 
   async function onSubmit(values: BeneficiaryInput) {
-    const payload = { ...values, projectIds: selected };
+    const allowed = centers.find((center) => center.id === values.centerId)?.projects.map((link) => link.projectId);
+    const payload = { ...values, projectIds: selected.filter((id) => !values.centerId || allowed?.includes(id)) };
     if (mode === "create") {
       const pending = { clientMutationId: crypto.randomUUID(), values: payload };
       const queue = async () => {
@@ -51,7 +54,7 @@ export function BeneficiaryForm({
         return;
       }
       try {
-        const result = await createBeneficiary(payload);
+        const result = await createBeneficiary({ ...payload, clientMutationId: pending.clientMutationId });
         if (!result.ok) {
           toast.error(t(`errors.${result.error}`));
           return;
@@ -77,6 +80,13 @@ export function BeneficiaryForm({
   return (
     <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={t("centers.title")}>
+          <NativeSelect {...form.register("centerId")} disabled={mode === "edit" && Boolean(defaults.centerId)}>
+            <option value="">{t("centers.unassigned")}</option>
+            {centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}
+          </NativeSelect>
+          <p className="text-xs text-muted-foreground">{t("centers.transferHelp")}</p>
+        </Field>
         <Field label={t("beneficiaries.firstName")}>
           <Input {...form.register("firstName")} />
         </Field>
@@ -112,7 +122,7 @@ export function BeneficiaryForm({
         <legend className="text-sm font-medium">{t("beneficiaries.projects")}</legend>
         <p className="text-sm text-muted-foreground">{t("beneficiaries.projectsHelp")}</p>
         <div className="grid gap-2 sm:grid-cols-2">
-          {projects.map((project) => {
+          {projects.filter((project) => !form.watch("centerId") || centers.find((center) => center.id === form.watch("centerId"))?.projects.some((link) => link.projectId === project.id)).map((project) => {
             const checked = selected.includes(project.id);
             return (
               <label key={project.id} className="flex items-center gap-3 rounded-lg border bg-card px-3 py-3">

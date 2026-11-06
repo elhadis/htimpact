@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { centerScope } from "@/lib/center-scope";
+import { prisma, rawPrisma } from "@/lib/prisma";
 import { buildProgress, type ProgressInput } from "@/lib/progress";
 import type { AttendanceStatus, ProjectStatus, ProjectType } from "@prisma/client";
 
@@ -75,6 +76,8 @@ export async function dashboardData() {
     conflictCount,
     activeProjects: projects.length,
     attendanceRate,
+    attendancePresent: positive,
+    attendanceAbsent: attendance.filter((row) => row.status === "ABSENT").length,
     projects: projects.map((project) => ({
       id: project.id,
       name: project.name,
@@ -93,8 +96,9 @@ export async function dashboardData() {
   };
 }
 
-export async function listProjects() {
+export async function listProjects(activeOnly = false) {
   const projects = await prisma.project.findMany({
+    where: activeOnly ? { status: { in: ["ACTIVE", "ON_HOLD"] } } : undefined,
     orderBy: { updatedAt: "desc" },
     include: progressInclude,
   });
@@ -178,8 +182,9 @@ export async function listBeneficiaries() {
 }
 
 export async function getBeneficiary(id: string) {
-  return prisma.beneficiary.findUnique({
-    where: { id },
+  const scope = await centerScope();
+  return rawPrisma.beneficiary.findUnique({
+    where: { id, ...(scope ? { centerId: scope.centerId } : {}) },
     include: {
       projects: { include: { project: true }, orderBy: { enrolledAt: "desc" } },
       enrollments: {
@@ -239,8 +244,9 @@ export async function getCohort(id: string) {
   });
 }
 
-export async function listSessions() {
+export async function listSessions(centerId?: string) {
   const sessions = await prisma.session.findMany({
+    where: centerId ? { cohort: { centerId } } : undefined,
     orderBy: { scheduledAt: "desc" },
     include: {
       facilitator: { select: { name: true } },
@@ -312,8 +318,9 @@ export async function getAttendanceSheet(sessionId: string) {
   };
 }
 
-export async function listStaff() {
+export async function listStaff(activeOnly = false) {
   const users = await prisma.user.findMany({
+    where: activeOnly ? { active: true } : undefined,
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -351,6 +358,7 @@ export async function getStaff(id: string) {
       title: true,
       active: true,
       isDemo: true,
+      centerId: true,
       role: true,
       projectAssignments: { select: { projectId: true } },
     },
@@ -390,7 +398,7 @@ export async function listConflicts() {
 }
 
 export async function optionLists() {
-  const [projects, courses, cohorts, people, staff] = await Promise.all([
+  const [projects, courses, cohorts, people, staff, centers] = await Promise.all([
     prisma.project.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, code: true, type: true, status: true },
@@ -417,6 +425,7 @@ export async function optionLists() {
       orderBy: { name: "asc" },
       select: { id: true, name: true, role: { select: { key: true } } },
     }),
+    prisma.center.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, projects: { select: { projectId: true } } } }),
   ]);
   return {
     projects,
@@ -441,6 +450,7 @@ export async function optionLists() {
       code: person.code,
     })),
     staff: staff.map((user) => ({ id: user.id, name: user.name, role: user.role.key })),
+    centers,
   };
 }
 

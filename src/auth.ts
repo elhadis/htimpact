@@ -2,7 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { rawPrisma as prisma } from "@/lib/prisma";
 import { assertDemoAllowed } from "@/lib/demo";
 import { isAppRole, type AppRole } from "@/lib/rbac";
 import { loginSchema } from "@/lib/validators";

@@ -1,5 +1,6 @@
 export const ROLES = [
   "ADMIN",
+  "CENTER_MANAGER",
   "PROJECT_MANAGER",
   "COORDINATOR",
   "FACILITATOR",
@@ -9,13 +10,15 @@ export const ROLES = [
 export type AppRole = (typeof ROLES)[number];
 
 export const RESOURCES = [
+  "centers",
+  "transfers",
+  "activities",
   "projects",
   "beneficiaries",
   "courses",
   "cohorts",
   "sessions",
   "attendance",
-  "activities",
   "staff",
   "reports",
   "audit",
@@ -33,6 +36,14 @@ const ALL = RESOURCES.flatMap((resource) =>
 
 const ROLE_MATRIX: Record<AppRole, string[]> = {
   ADMIN: ["*"],
+  CENTER_MANAGER: [
+    "centers:read", "transfers:read", "transfers:create",
+    "projects:read", "beneficiaries:create", "beneficiaries:read", "beneficiaries:update",
+    "courses:create", "courses:read", "cohorts:create", "cohorts:read", "cohorts:update",
+    "sessions:create", "sessions:read", "attendance:read", "attendance:create", "attendance:update",
+    "activities:create", "activities:read", "activities:update", "staff:read",
+    "reports:read", "reports:export", "audit:read", "sync:read", "sync:update",
+  ],
   PROJECT_MANAGER: [
     "projects:create",
     "projects:read",
@@ -125,6 +136,7 @@ const ROLE_MATRIX: Record<AppRole, string[]> = {
 };
 
 export const ROLE_DETAILS: Record<AppRole, { name: string; description: string }> = {
+  CENTER_MANAGER: { name: "Center manager", description: "Manages only the people and delivery at their assigned center." },
   ADMIN: {
     name: "Administrator",
     description: "Full access to programs, people, staff, and records.",

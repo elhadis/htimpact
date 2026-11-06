@@ -8,13 +8,13 @@ import { PageHeader } from "@/components/chrome";
 import { Forbidden } from "@/components/forbidden";
 import { StaffTable } from "@/components/lists";
 
-export default async function StaffPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function StaffPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ status?: string; active?: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const session = await auth();
   if (!session?.user || !can(session.user.role, "staff", "read")) return <Forbidden />;
   const t = await getTranslations();
-  const rows = await listStaff();
+  const rows = await listStaff((await searchParams).active === "1");
   return (
     <div className="space-y-8">
       <PageHeader

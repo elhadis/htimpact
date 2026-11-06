@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { can } from "@/lib/rbac";
 import { listCourses } from "@/lib/queries";
@@ -7,13 +8,14 @@ import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/chrome";
 import { Forbidden } from "@/components/forbidden";
 
-export default async function CoursesPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function CoursesPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ view?: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const session = await auth();
   if (!session?.user || !can(session.user.role, "courses", "read")) return <Forbidden />;
   const t = await getTranslations();
   const courses = await listCourses();
+  const activities = (await searchParams).view === "all" ? await prisma.activity.findMany({ orderBy: { name: "asc" } }) : [];
   return (
     <div>
       <PageHeader
@@ -37,6 +39,7 @@ export default async function CoursesPage({ params }: { params: Promise<{ locale
           </Link>
         ))}
       </div>
+      {activities.length > 0 && <section className="mt-5 space-y-3"><h2 className="font-semibold">{t("nav.activities")}</h2>{activities.map((activity) => <Link key={activity.id} href={`/projects/${activity.projectId}`} className="block rounded-xl border bg-card p-4">{activity.name}</Link>)}</section>}
     </div>
   );
 }

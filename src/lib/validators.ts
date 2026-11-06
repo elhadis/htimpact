@@ -52,6 +52,7 @@ export const projectSchema = z
   });
 
 export const beneficiarySchema = z.object({
+  centerId: z.string().optional(),
   firstName: requiredText,
   lastName: requiredText,
   gender: z.enum(genders),
@@ -77,6 +78,7 @@ export const courseSchema = z.object({
 });
 
 export const cohortSchema = z.object({
+  centerId: z.string().optional(),
   courseId: z.string().min(1),
   name: requiredText,
   startDate: z.string().min(1),
@@ -96,6 +98,7 @@ export const sessionSchema = z.object({
 });
 
 export const activitySchema = z.object({
+  centerId: z.string().optional(),
   projectId: z.string().min(1),
   name: requiredText,
   description: optionalText,
@@ -104,6 +107,7 @@ export const activitySchema = z.object({
 });
 
 export const staffSchema = z.object({
+  centerId: z.string().optional(),
   name: requiredText,
   email: z.string().trim().email("email"),
   password: z.string().min(8, "password").max(80, "max"),
@@ -150,3 +154,20 @@ export type SessionInput = z.infer<typeof sessionSchema>;
 export type ActivityInput = z.infer<typeof activitySchema>;
 export type StaffInput = z.infer<typeof staffSchema>;
 export type StaffUpdateInput = z.infer<typeof staffUpdateSchema>;
+
+export const centerSchema = z.object({
+  id: z.string().optional(),
+  code: z.string().trim().min(2).max(20).regex(/^[A-Za-z0-9-]+$/),
+  name: requiredText,
+  location: optionalText,
+  active: z.boolean().default(true),
+  projectIds: z.array(z.string()).default([]),
+  managerIds: z.array(z.string()).default([]),
+});
+export const transferSchema = z.object({
+  id: z.string().uuid(),
+  beneficiaryId: z.string().min(1),
+  fromCenterId: z.string().min(1),
+  toCenterId: z.string().min(1),
+  reason: z.string().trim().max(1000).optional(),
+});

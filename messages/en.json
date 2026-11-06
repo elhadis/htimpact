@@ -22,7 +22,8 @@
     "forbidden": "Your role does not include this action.",
     "edit": "Edit",
     "view": "View",
-    "all": "All projects"
+    "all": "All projects",
+    "select": "Select"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -35,7 +36,10 @@
     "staff": "Staff",
     "reports": "Reports",
     "audit": "Audit log",
-    "sync": "Sync"
+    "sync": "Sync",
+    "centers": "Centers",
+    "transfers": "Transfers",
+    "activities": "Activities"
   },
   "auth": {
     "email": "Email",
@@ -80,14 +84,19 @@
     "ENROLLMENT_MISSING": "This person is not enrolled in the class.",
     "BENEFICIARY_MISSING": "The beneficiary record was not found. No duplicate was created.",
     "PROJECT_MISSING": "The project was not found.",
-    "NOT_ASSIGNED": "You are not assigned to this project."
+    "NOT_ASSIGNED": "You are not assigned to this project.",
+    "transferPending": "A transfer is pending or the beneficiary’s center has changed.",
+    "transferChanged": "The transfer details changed. Refresh the page.",
+    "transferRequired": "Use a transfer request to change the center.",
+    "centerRequired": "Select a center for the beneficiary."
   },
   "roles": {
     "ADMIN": "Administrator",
     "PROJECT_MANAGER": "Project manager",
     "COORDINATOR": "Coordinator",
     "FACILITATOR": "Facilitator",
-    "VIEWER": "Viewer"
+    "VIEWER": "Viewer",
+    "CENTER_MANAGER": "Center manager"
   },
   "roleHelp": {
     "ADMIN": "Full access to programs, people, staff, and records.",
@@ -243,7 +252,7 @@
     "empty": "Schedule a session before taking attendance."
   },
   "staff": {
-    "title": "Staff and access",
+    "title": "Job title",
     "intro": "The system role controls what a person can do. Project assignment shows where they work.",
     "new": "Add staff",
     "edit": "Edit staff",
@@ -252,7 +261,6 @@
     "password": "Password",
     "passwordHelp": "At least 8 characters. The local demo account is separate and works only in development.",
     "role": "Role",
-    "title": "Job title",
     "phone": "Phone",
     "active": "Active account",
     "projects": "Project assignments",
@@ -294,6 +302,31 @@
     "rule3": "A mark taken during the session (from 15 minutes before the start until 2 hours after the end) replaces a server edit made outside that window.",
     "rule4": "A field mark outside the session window never overwrites the server.",
     "rule5": "If both marks were taken during the session and they disagree, the server value stays until someone chooses.",
-    "rule6": "Project assignment never copies a person. A new link is created, an existing active link is left as-is, and a withdraw is blocked when server notes changed or the device has no base version."
+    "rule6": "Project assignment never copies a person. A new link is created, an existing active link is left as-is, and a withdraw is blocked when server notes changed or the device has no base version.",
+    "queued": "Saved locally, awaiting sync"
+  },
+  "centers": {
+    "title": "Centers",
+    "name": "Center name",
+    "intro": "Manage centers, their projects, beneficiaries and managers",
+    "new": "Add center",
+    "empty": "No centers yet",
+    "inactive": "Inactive",
+    "unassigned": "Unassigned",
+    "transferHelp": "Changing a beneficiary’s center requires a transfer request and administrator approval.",
+    "projects": "Center projects",
+    "managers": "Center managers",
+    "managerHelp": "Create the center first, then create a Center manager account in Staff and select its center.",
+    "transfers": "Beneficiary transfers",
+    "destination": "Destination center",
+    "reason": "Reason for transfer",
+    "request": "Request transfer",
+    "approvalHelp": "The beneficiary remains at the current center until the administrator approves. All previous records are retained.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "reviewOnline": "Transfer review requires an internet connection to verify the current center.",
+    "PENDING": "Pending approval",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected"
   }
 }

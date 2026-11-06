@@ -63,7 +63,7 @@ export function ProjectForm({
         return;
       }
       try {
-        const result = await createProject(values);
+        const result = await createProject({ ...values, clientMutationId: pending.clientMutationId });
         if (!result.ok) {
           toast.error(t.has(`errors.${result.error}`) ? t(`errors.${result.error}`) : t("errors.invalid"));
           return;

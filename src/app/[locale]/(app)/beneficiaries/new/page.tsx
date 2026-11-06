@@ -19,7 +19,9 @@ export default async function NewBeneficiaryPage({ params }: { params: Promise<{
       <BeneficiaryForm
         mode="create"
         projects={options.projects}
+        centers={options.centers}
         defaults={{
+          centerId: options.centers.length === 1 && session.user.role === "CENTER_MANAGER" ? options.centers[0].id : "",
           firstName: "",
           lastName: "",
           gender: "UNSPECIFIED",

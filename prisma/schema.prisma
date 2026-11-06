@@ -41,8 +41,8 @@ enum AuditAction {
 }
 
 model Role {
-  id          String  @id @default(cuid())
-  key         String  @unique
+  id          String @id @default(cuid())
+  key         String @unique
   name        String
   description String
   users       User[]
@@ -62,6 +62,9 @@ model User {
   role         Role     @relation(fields: [roleId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  centerId String?
+  center   Center? @relation(fields: [centerId], references: [id])
 
   projectAssignments  ProjectStaff[]
   attendanceTaken     AttendanceRecord[] @relation("TakenBy")
@@ -83,6 +86,7 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  centers       CenterProject[]
   targets       ProjectTarget[]
   staff         ProjectStaff[]
   beneficiaries ProjectBeneficiary[]
@@ -129,6 +133,10 @@ model Beneficiary {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  centerId  String?
+  center    Center?          @relation(fields: [centerId], references: [id])
+  transfers CenterTransfer[]
+
   projects      ProjectBeneficiary[]
   enrollments   CohortEnrollment[]
   attendance    AttendanceRecord[]
@@ -167,16 +175,18 @@ model Course {
 }
 
 model Cohort {
-  id          String    @id @default(cuid())
+  centerId    String?
+  center      Center?            @relation(fields: [centerId], references: [id])
+  id          String             @id @default(cuid())
   courseId    String
-  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course      Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
   name        String
   startDate   DateTime
   endDate     DateTime?
   capacity    Int?
   location    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   enrollments CohortEnrollment[]
   sessions    Session[]
 
@@ -198,18 +208,18 @@ model CohortEnrollment {
 }
 
 model Session {
-  id            String    @id @default(cuid())
+  id            String             @id @default(cuid())
   cohortId      String
-  cohort        Cohort    @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  cohort        Cohort             @relation(fields: [cohortId], references: [id], onDelete: Cascade)
   title         String
   scheduledAt   DateTime
-  durationMin   Int       @default(60)
+  durationMin   Int                @default(60)
   location      String?
   facilitatorId String?
-  facilitator   User?     @relation("Facilitator", fields: [facilitatorId], references: [id])
+  facilitator   User?              @relation("Facilitator", fields: [facilitatorId], references: [id])
   notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
   attendance    AttendanceRecord[]
 
   @@index([cohortId])
@@ -237,15 +247,17 @@ model AttendanceRecord {
 }
 
 model Activity {
-  id          String    @id @default(cuid())
+  centerId    String?
+  center      Center?            @relation(fields: [centerId], references: [id])
+  id          String             @id @default(cuid())
   projectId   String
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name        String
   description String?
   scheduledAt DateTime?
   location    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   logs        ParticipationLog[]
 
   @@index([projectId])
@@ -296,4 +308,55 @@ model SyncConflict {
 
   @@index([status, createdAt])
   @@index([entityKey])
+}
+
+model Center {
+  id            String           @id @default(cuid())
+  code          String           @unique
+  name          String
+  location      String?
+  active        Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  staff         User[]
+  beneficiaries Beneficiary[]
+  projects      CenterProject[]
+  cohorts       Cohort[]
+  activities    Activity[]
+  transfersFrom CenterTransfer[] @relation("TransferFrom")
+  transfersTo   CenterTransfer[] @relation("TransferTo")
+}
+
+model CenterProject {
+  centerId  String
+  projectId String
+  center    Center  @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([centerId, projectId])
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CenterTransfer {
+  id            String         @id @default(cuid())
+  beneficiaryId String
+  beneficiary   Beneficiary    @relation(fields: [beneficiaryId], references: [id])
+  fromCenterId  String
+  fromCenter    Center         @relation("TransferFrom", fields: [fromCenterId], references: [id])
+  toCenterId    String
+  toCenter      Center         @relation("TransferTo", fields: [toCenterId], references: [id])
+  reason        String?
+  status        TransferStatus @default(PENDING)
+  requestedById String
+  reviewedById  String?
+  createdAt     DateTime       @default(now())
+  reviewedAt    DateTime?
+
+  @@index([status, createdAt])
+  @@index([beneficiaryId])
 }

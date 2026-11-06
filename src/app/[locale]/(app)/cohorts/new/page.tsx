@@ -16,7 +16,7 @@ export default async function NewCohortPage({ params }: { params: Promise<{ loca
   return (
     <div>
       <PageHeader title={t("learning.newCohort")} description={t("learning.cohortsIntro")} />
-      <CohortForm courses={options.courses} />
+      <CohortForm centers={options.centers} courses={options.courses} />
     </div>
   );
 }

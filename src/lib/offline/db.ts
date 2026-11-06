@@ -1,6 +1,7 @@
 "use client";
 
 import Dexie, { type Table } from "dexie";
+import type { centerSchema, transferSchema } from "@/lib/validators";
 import type { ProjectInput, BeneficiaryInput } from "@/lib/validators";
 import type { z } from "zod";
 import { cohortSchema, sessionSchema, activitySchema } from "@/lib/validators";
@@ -59,7 +60,12 @@ export type CachedRoster = {
   payload: string;
 };
 
+export type QueuedCenter = { clientMutationId: string; values: z.infer<typeof centerSchema> };
+export type QueuedTransfer = { clientMutationId: string; values: z.infer<typeof transferSchema> };
+
 class ImpactDB extends Dexie {
+  centerQueue!: Table<QueuedCenter, string>;
+  transferQueue!: Table<QueuedTransfer, string>;
   attendanceQueue!: Table<QueuedAttendance, string>;
   assignmentQueue!: Table<QueuedAssignment, string>;
   rosters!: Table<CachedRoster, string>;
@@ -72,8 +78,8 @@ class ImpactDB extends Dexie {
   sessionQueue!: Table<QueuedSession, string>;
   activityQueue!: Table<QueuedActivity, string>;
 
-  constructor() {
-    super("ht-impact-manager");
+  constructor(name: string) {
+    super(name);
     this.version(1).stores({
       attendanceQueue: "clientMutationId, sessionId, beneficiaryId",
       assignmentQueue: "clientMutationId, projectId, beneficiaryId",
@@ -119,7 +125,9 @@ class ImpactDB extends Dexie {
       projectQueue: "clientMutationId",
       beneficiaryQueue: "clientMutationId",
     });
-    this.version(7).stores({
+    this.version(8).stores({
+      centerQueue: "clientMutationId",
+      transferQueue: "clientMutationId",
       attendanceQueue: "clientMutationId, sessionId, beneficiaryId",
       assignmentQueue: "clientMutationId, projectId, beneficiaryId",
       rosters: "sessionId",
@@ -135,7 +143,22 @@ class ImpactDB extends Dexie {
   }
 }
 
-export const offlineDb = new ImpactDB();
+let activeScope = "unassigned";
+const databases = new Map<string, ImpactDB>();
+export function setOfflineScope(scope: string) { activeScope = scope; }
+function database() {
+  let db = databases.get(activeScope);
+  if (!db) { db = new ImpactDB(`ht-impact-manager:${activeScope}`); databases.set(activeScope, db); }
+  return db;
+}
+// Legacy shared queues are intentionally not reassigned to an arbitrary account.
+export const offlineDb = new Proxy({} as ImpactDB, {
+  get(_target, key) {
+    const db = database();
+    const value = Reflect.get(db, key, db);
+    return typeof value === "function" ? value.bind(db) : value;
+  },
+});
 
 export function queueModeEnabled() {
   return typeof window !== "undefined" && (localStorage.getItem("ht-queue-mode") === "1" || !navigator.onLine);

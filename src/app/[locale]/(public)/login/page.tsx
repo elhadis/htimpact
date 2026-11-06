@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { auth } from "@/auth";
 import { isDemoLoginEnabled } from "@/lib/demo";
-import { prisma } from "@/lib/prisma";
+import { rawPrisma as prisma } from "@/lib/prisma";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { LoginForm } from "@/components/login-form";
 

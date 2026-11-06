@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { signOut } from "next-auth/react";
 import {
+  Building2,
+  ArrowRightLeft,
+  Activity,
   ClipboardCheck,
   FolderKanban,
   GraduationCap,
@@ -19,9 +22,11 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
-import { offlineDb, queueModeEnabled, type QueuedAttendance, type QueuedAssignment, type QueuedParticipation, type QueuedEnrollment, type QueuedCourse, type QueuedProject, type QueuedBeneficiary, type QueuedCohort, type QueuedSession, type QueuedActivity } from "@/lib/offline/db";
+import { offlineDb, type QueuedAttendance, type QueuedAssignment, type QueuedParticipation, type QueuedEnrollment, type QueuedCourse, type QueuedProject, type QueuedBeneficiary, type QueuedCohort, type QueuedSession, type QueuedActivity, type QueuedCenter, type QueuedTransfer } from "@/lib/offline/db";
+import { saveCenter, requestTransfer } from "@/server/centers";
+import { clearOfflinePages } from "@/components/offline-boundary";
 import { syncQueued, saveParticipation, enrollBeneficiary, createCourse, createProject, createBeneficiary, createCohort, createSession, createActivity } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
@@ -32,6 +37,9 @@ import { toast } from "sonner";
 
 const links: { href: string; key: string; icon: typeof LayoutDashboard; resource?: Resource }[] = [
   { href: "/dashboard", key: "dashboard", icon: LayoutDashboard },
+  { href: "/centers", key: "centers", icon: Building2, resource: "centers" },
+  { href: "/transfers", key: "transfers", icon: ArrowRightLeft, resource: "transfers" },
+  { href: "/activities", key: "activities", icon: Activity, resource: "activities" },
   { href: "/projects", key: "projects", icon: FolderKanban, resource: "projects" },
   { href: "/beneficiaries", key: "beneficiaries", icon: Users, resource: "beneficiaries" },
   { href: "/courses", key: "courses", icon: GraduationCap, resource: "courses" },
@@ -50,11 +58,12 @@ export function AppShell({
   children,
 }: {
   locale: string;
-  user: { name: string; email: string; role: AppRole; isDemo: boolean };
+  user: { id: string; name: string; email: string; role: AppRole; isDemo: boolean };
   children: React.ReactNode;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
@@ -75,7 +84,8 @@ export function AppShell({
       offlineDb.sessionQueue.count(),
       offlineDb.activityQueue.count(),
     ]) as [number, number, number, number, number, number, number, number, number, number];
-    setQueued(attendance + assignments + participation + enrollments + courses + projects + beneficiaries + cohorts + sessions + activities);
+    const extra = await offlineDb.centerQueue.count() + await offlineDb.transferQueue.count();
+    setQueued(extra + attendance + assignments + participation + enrollments + courses + projects + beneficiaries + cohorts + sessions + activities);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
   }
@@ -93,6 +103,8 @@ export function AppShell({
     let cohorts: QueuedCohort[];
     let sessions: QueuedSession[];
     let activities: QueuedActivity[];
+    let centers: QueuedCenter[];
+    let transfers: QueuedTransfer[];
     try {
       [attendance, assignments, participation, enrollments, courses, projects, beneficiaries, cohorts, sessions, activities] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
@@ -106,12 +118,14 @@ export function AppShell({
         offlineDb.sessionQueue.toArray(),
         offlineDb.activityQueue.toArray(),
       ]) as [QueuedAttendance[], QueuedAssignment[], QueuedParticipation[], QueuedEnrollment[], QueuedCourse[], QueuedProject[], QueuedBeneficiary[], QueuedCohort[], QueuedSession[], QueuedActivity[]];
+      centers = await offlineDb.centerQueue.toArray();
+      transfers = await offlineDb.transferQueue.toArray();
     } catch {
       syncInProgress.current = false;
       toast.error(t("errors.syncFailed"));
       return;
     }
-    if (attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length + beneficiaries.length + cohorts.length + sessions.length + activities.length === 0) {
+    if (centers.length + transfers.length + attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length + beneficiaries.length + cohorts.length + sessions.length + activities.length === 0) {
       syncInProgress.current = false;
       return;
     }
@@ -120,55 +134,23 @@ export function AppShell({
       let conflicts = 0;
       let rejected = 0;
       let failed = false;
-      if (attendance.length || assignments.length) {
+      for (const mutation of projects) {
         try {
-          const result = await syncQueued({
-            attendance: attendance.map((row) => ({ ...row, source: "offline" as const })),
-            assignments,
-          });
-          if (result.ok) {
-            await offlineDb.attendanceQueue.bulkDelete(result.attendance.filter((row) => ["applied", "noop", "conflict"].includes(row.result)).map((row) => row.clientMutationId));
-            await offlineDb.assignmentQueue.bulkDelete(result.assignments.filter((row) => ["applied", "noop", "conflict"].includes(row.result)).map((row) => row.clientMutationId));
-            conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
-            rejected = [...result.attendance, ...result.assignments].filter((row) => row.result === "rejected").length;
-          } else {
-            failed = true;
-          }
-        } catch {
-          failed = true;
-        }
-      }
-      for (const mutation of participation) {
-        try {
-          const saved = await saveParticipation({ activityId: mutation.activityId, rows: mutation.rows });
-          if (saved.ok) await offlineDb.participationQueue.delete(mutation.clientMutationId);
+          const saved = await createProject({ ...mutation.values, clientMutationId: mutation.clientMutationId });
+          if (saved.ok) await offlineDb.projectQueue.delete(mutation.clientMutationId);
           else failed = true;
         } catch {
           failed = true;
         }
       }
-      for (const mutation of enrollments) {
-        try {
-          const saved = await enrollBeneficiary({ cohortId: mutation.cohortId, beneficiaryId: mutation.beneficiaryId });
-          if (saved.ok) await offlineDb.enrollmentQueue.delete(mutation.clientMutationId);
-          else failed = true;
-        } catch {
-          failed = true;
-        }
+      for (const mutation of centers) {
+        try { const saved = await saveCenter(mutation.values); if (saved.ok) await offlineDb.centerQueue.delete(mutation.clientMutationId); else failed = true; }
+        catch { failed = true; }
       }
       for (const mutation of beneficiaries) {
         try {
           const saved = await createBeneficiary({ ...mutation.values, clientMutationId: mutation.clientMutationId });
           if (saved.ok) await offlineDb.beneficiaryQueue.delete(mutation.clientMutationId);
-          else failed = true;
-        } catch {
-          failed = true;
-        }
-      }
-      for (const mutation of projects) {
-        try {
-          const saved = await createProject({ ...mutation.values, clientMutationId: mutation.clientMutationId });
-          if (saved.ok) await offlineDb.projectQueue.delete(mutation.clientMutationId);
           else failed = true;
         } catch {
           failed = true;
@@ -210,8 +192,49 @@ export function AppShell({
           failed = true;
         }
       }
+      for (const mutation of enrollments) {
+        try {
+          const saved = await enrollBeneficiary({ cohortId: mutation.cohortId, beneficiaryId: mutation.beneficiaryId });
+          if (saved.ok) await offlineDb.enrollmentQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
+      }
+      if (attendance.length || assignments.length) {
+        try {
+          const result = await syncQueued({
+            attendance: attendance.map((row) => ({ ...row, source: "offline" as const })),
+            assignments,
+          });
+          if (result.ok) {
+            await offlineDb.attendanceQueue.bulkDelete(result.attendance.filter((row) => ["applied", "noop", "conflict"].includes(row.result)).map((row) => row.clientMutationId));
+            await offlineDb.assignmentQueue.bulkDelete(result.assignments.filter((row) => ["applied", "noop", "conflict"].includes(row.result)).map((row) => row.clientMutationId));
+            conflicts = [...result.attendance, ...result.assignments].filter((row) => row.result === "conflict").length;
+            rejected = [...result.attendance, ...result.assignments].filter((row) => row.result === "rejected").length;
+          } else {
+            failed = true;
+          }
+        } catch {
+          failed = true;
+        }
+      }
+      for (const mutation of participation) {
+        try {
+          const saved = await saveParticipation({ activityId: mutation.activityId, rows: mutation.rows });
+          if (saved.ok) await offlineDb.participationQueue.delete(mutation.clientMutationId);
+          else failed = true;
+        } catch {
+          failed = true;
+        }
+      }
+      for (const mutation of transfers) {
+        try { const saved = await requestTransfer(mutation.values); if (saved.ok) await offlineDb.transferQueue.delete(mutation.clientMutationId); else failed = true; }
+        catch { failed = true; }
+      }
       if (failed || rejected) toast.error(t("errors.syncFailed"));
       else toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
+      router.refresh();
     } catch {
       toast.error(t("errors.syncFailed"));
     } finally {
@@ -238,9 +261,51 @@ export function AppShell({
       window.removeEventListener("offline", onOffline);
       window.clearInterval(timer);
     };
-    // flush identity is stable enough for this session widget
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
+  useEffect(() => {
+    if (!navigator.onLine || !("serviceWorker" in navigator)) return;
+    let stopped = false;
+    const timer = window.setTimeout(async () => {
+      await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller) return;
+      const scope = localStorage.getItem("ht-active-scope");
+      if (!scope) return;
+      const routes = links.filter((link) => !link.resource || can(user.role, link.resource, "read")).map((link) => link.href);
+      for (const resource of ["beneficiaries", "courses", "cohorts", "sessions", "staff", "projects", "centers"] as const) {
+        if (can(user.role, resource, "create")) routes.push(`/${resource}/new`);
+      }
+      const urls = new Set(routes.flatMap((route) => ["en", "ar"].map((language) => `/${language}${route}`)));
+      document.querySelectorAll<HTMLAnchorElement>("main a[href]").forEach((anchor) => {
+        const url = new URL(anchor.href);
+        if (url.origin === location.origin && /^\/(en|ar)\//.test(url.pathname)) urls.add(url.pathname + url.search);
+      });
+      const pending = [...urls];
+      async function worker() {
+        while (pending.length && !stopped && navigator.onLine) {
+          const href = pending.shift()!;
+          try {
+            const response = await fetch(href, { headers: { "X-HT-Offline-Scope": scope! }, cache: "no-store" });
+            if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) continue;
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            const assets = new Set<string>();
+            doc.querySelectorAll("script[src], link[rel=stylesheet], link[as=font]").forEach((element) => {
+              const asset = new URL(element.getAttribute("src") ?? element.getAttribute("href") ?? "", location.origin);
+              if (asset.origin === location.origin && asset.pathname.startsWith("/_next/static/")) assets.add(asset.href);
+            });
+            for (const asset of assets) {
+              if (stopped || !navigator.onLine) break;
+              await fetch(asset).catch(() => undefined);
+            }
+          } catch { /* A failed warm-up never discards queued work. */ }
+        }
+      }
+      await Promise.all([worker(), worker()]);
+    }, 1200);
+    return () => { stopped = true; window.clearTimeout(timer); };
+  }, [pathname, locale, user.role]);
 
   function toggleQueue() {
     const next = !queueMode;
@@ -334,7 +399,7 @@ export function AppShell({
                   {user.isDemo ? <p className="mt-1 text-amber-800">{t("auth.demoChip")}</p> : null}
                 </div>
                 <DropdownMenuItem
-                  onSelect={() => signOut({ callbackUrl: `/${locale}/login` })}
+                  onSelect={() => { void clearOfflinePages().then(() => signOut({ callbackUrl: `/${locale}/login` })); }}
                 >
                   {t("common.signOut")}
                 </DropdownMenuItem>

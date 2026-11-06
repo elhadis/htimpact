@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { prisma, rawPrisma } from "@/lib/prisma";
+import { deliveryCenter, currentActor } from "@/lib/center-scope";
+import { ROLE_DETAILS } from "@/lib/rbac";
 import { guard, facilitatorAssigned } from "@/lib/guard";
 import { writeAudit } from "@/lib/audit";
 import { parseDateInput } from "@/lib/format";
@@ -44,10 +46,10 @@ function emptyToNull(value?: string | null) {
 }
 
 async function nextBeneficiaryCode() {
-  const count = await prisma.beneficiary.count();
+  const count = await rawPrisma.beneficiary.count();
   for (let offset = 1; offset <= 30; offset += 1) {
     const code = `BEN-${String(count + offset).padStart(4, "0")}`;
-    const existing = await prisma.beneficiary.findUnique({ where: { code } });
+    const existing = await rawPrisma.beneficiary.findUnique({ where: { code } });
     if (!existing) return code;
   }
   return `BEN-${Date.now().toString(36).toUpperCase()}`;
@@ -148,6 +150,13 @@ export async function createBeneficiary(input: unknown) {
   const parsed = beneficiarySchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const data = parsed.data;
+  const center = await deliveryCenter(data.centerId);
+  if (!center.ok) return fail("forbidden");
+  if (!center.centerId && await rawPrisma.center.count({ where: { active: true } })) return fail("centerRequired");
+  if (center.centerId) {
+    const count = await rawPrisma.centerProject.count({ where: { centerId: center.centerId, projectId: { in: [...new Set(data.projectIds)] } } });
+    if (count !== new Set(data.projectIds).size) return fail("forbidden");
+  }
   const nationalId = emptyToNull(data.nationalId);
   if (mutationId) {
     const prior = await prisma.beneficiary.findUnique({ where: { id: mutationId } });
@@ -162,6 +171,7 @@ export async function createBeneficiary(input: unknown) {
       data: {
         ...(mutationId ? { id: mutationId } : {}),
         code: await nextBeneficiaryCode(),
+        centerId: center.centerId,
         firstName: data.firstName,
         lastName: data.lastName,
         gender: data.gender,
@@ -202,11 +212,19 @@ export async function updateBeneficiary(id: string, input: unknown) {
   const parsed = beneficiarySchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const data = parsed.data;
+  const currentPerson = await prisma.beneficiary.findUnique({ where: { id } });
+  if (!currentPerson) return fail("notFound");
+  if (currentPerson.centerId && data.centerId && data.centerId !== currentPerson.centerId) return fail("transferRequired");
+  const center = await deliveryCenter(currentPerson.centerId ?? data.centerId);
+  if (!center.ok) return fail("forbidden");
+  if (!currentPerson.centerId && data.centerId && (await currentActor())?.role.key !== "ADMIN") return fail("forbidden");
+  if (center.centerId && await rawPrisma.centerProject.count({ where: { centerId: center.centerId, projectId: { in: [...new Set(data.projectIds)] } } }) !== new Set(data.projectIds).size) return fail("forbidden");
   const nationalId = emptyToNull(data.nationalId);
   try {
     await prisma.beneficiary.update({
       where: { id },
       data: {
+        centerId: center.centerId,
         firstName: data.firstName,
         lastName: data.lastName,
         gender: data.gender,
@@ -333,19 +351,18 @@ export async function createCohort(input: unknown) {
   const access = await guard("cohorts", "create");
   if (!access.ok) return fail(access.error);
   const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
-  if (mutationId) {
-    const existing = await prisma.cohort.findUnique({ where: { id: mutationId } });
-    if (existing) return { ok: true as const, id: existing.id };
-  }
   const parsed = cohortSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const course = await prisma.course.findUnique({ where: { id: parsed.data.courseId } });
   if (!course) return fail("notFound");
+  const center = await deliveryCenter(parsed.data.centerId, course.projectId);
+  if (!center.ok) return fail("forbidden");
   const cohort = mutationId && await prisma.cohort.findUnique({ where: { id: mutationId } }) || await (async () => {
     try {
       return await prisma.cohort.create({
     data: {
       ...(mutationId ? { id: mutationId } : {}),
+      centerId: center.centerId,
       courseId: course.id,
       name: parsed.data.name,
       startDate: parseDateInput(parsed.data.startDate),
@@ -385,6 +402,7 @@ export async function enrollBeneficiary(input: { cohortId: string; beneficiaryId
   });
   const person = await prisma.beneficiary.findUnique({ where: { id: input.beneficiaryId } });
   if (!cohort || !person) return fail("notFound");
+  if (cohort.centerId !== person.centerId) return fail("forbidden");
   if (cohort.course.projectId) {
     const link = await prisma.projectBeneficiary.findUnique({
       where: {
@@ -432,10 +450,6 @@ export async function createSession(input: unknown) {
   const access = await guard("sessions", "create");
   if (!access.ok) return fail(access.error);
   const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
-  if (mutationId) {
-    const existing = await prisma.session.findUnique({ where: { id: mutationId } });
-    if (existing) return { ok: true as const, id: existing.id };
-  }
   const parsed = sessionSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const cohort = await prisma.cohort.findUnique({
@@ -540,20 +554,19 @@ export async function createActivity(input: unknown) {
   const access = await guard("activities", "create");
   if (!access.ok) return fail(access.error);
   const mutationId = input && typeof input === "object" && "clientMutationId" in input && typeof input.clientMutationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientMutationId) ? input.clientMutationId : null;
-  if (mutationId) {
-    const existing = await prisma.activity.findUnique({ where: { id: mutationId } });
-    if (existing) return { ok: true as const, id: existing.id };
-  }
   const parsed = activitySchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
   const project = await prisma.project.findUnique({ where: { id: parsed.data.projectId } });
   if (!project) return fail("notFound");
   if (project.type !== "NON_EDUCATIONAL") return fail("notActivity");
+  const center = await deliveryCenter(parsed.data.centerId, project.id);
+  if (!center.ok) return fail("forbidden");
   const activity = mutationId && await prisma.activity.findUnique({ where: { id: mutationId } }) || await (async () => {
     try {
       return await prisma.activity.create({
     data: {
       ...(mutationId ? { id: mutationId } : {}),
+      centerId: center.centerId,
       projectId: project.id,
       name: parsed.data.name,
       description: emptyToNull(parsed.data.description),
@@ -591,6 +604,10 @@ export async function saveParticipation(input: {
   const allowed = await facilitatorAssigned(access.session.user.id, access.session.user.role, activity.projectId);
   if (!allowed) return fail("notAssigned");
   for (const row of input.rows) {
+    const person = await prisma.beneficiary.findUnique({ where: { id: row.beneficiaryId } });
+    if (!person || person.centerId !== activity.centerId || !await prisma.projectBeneficiary.findFirst({ where: { projectId: activity.projectId, beneficiaryId: row.beneficiaryId, status: "active" } })) return fail("forbidden");
+  }
+  for (const row of input.rows) {
     await prisma.participationLog.upsert({
       where: { activityId_beneficiaryId: { activityId: activity.id, beneficiaryId: row.beneficiaryId } },
       create: {
@@ -618,11 +635,16 @@ export async function createStaff(input: unknown) {
   if (!access.ok) return fail(access.error);
   const parsed = staffSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
-  const role = await prisma.role.findUnique({ where: { key: parsed.data.role } });
+  const actor = await currentActor();
+  if (actor?.role.key !== "ADMIN" && (parsed.data.role === "ADMIN" || parsed.data.role === "CENTER_MANAGER" || parsed.data.centerId)) return fail("forbidden");
+  if (parsed.data.role === "CENTER_MANAGER" && !parsed.data.centerId) return fail("invalid");
+  if (parsed.data.centerId && !await rawPrisma.center.findFirst({ where: { id: parsed.data.centerId, active: true } })) return fail("invalid");
+  const role = await prisma.role.upsert({ where: { key: parsed.data.role }, update: {}, create: { key: parsed.data.role, ...ROLE_DETAILS[parsed.data.role] } });
   if (!role) return fail("invalid");
   try {
     const user = await prisma.user.create({
       data: {
+        centerId: parsed.data.centerId || null,
         name: parsed.data.name,
         email: parsed.data.email.toLowerCase(),
         passwordHash: await bcrypt.hash(parsed.data.password, 10),
@@ -654,9 +676,14 @@ export async function updateStaff(id: string, input: unknown) {
   if (!access.ok) return fail(access.error);
   const parsed = staffUpdateSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");
-  const role = await prisma.role.findUnique({ where: { key: parsed.data.role } });
+  const actor = await currentActor();
+  if (actor?.role.key !== "ADMIN" && (parsed.data.role === "ADMIN" || parsed.data.role === "CENTER_MANAGER" || parsed.data.centerId)) return fail("forbidden");
+  if (parsed.data.role === "CENTER_MANAGER" && !parsed.data.centerId) return fail("invalid");
+  if (parsed.data.centerId && !await rawPrisma.center.findFirst({ where: { id: parsed.data.centerId, active: true } })) return fail("invalid");
+  const role = await prisma.role.upsert({ where: { key: parsed.data.role }, update: {}, create: { key: parsed.data.role, ...ROLE_DETAILS[parsed.data.role] } });
   const current = await prisma.user.findUnique({ where: { id }, include: { role: true } });
   if (!role || !current) return fail("notFound");
+  if (actor?.role.key !== "ADMIN" && (current.role.key === "ADMIN" || current.role.key === "CENTER_MANAGER" || current.centerId)) return fail("forbidden");
   if (current.role.key === "ADMIN" && parsed.data.role !== "ADMIN") {
     const admins = await prisma.user.count({
       where: { active: true, role: { key: "ADMIN" }, NOT: { id } },
@@ -675,6 +702,7 @@ export async function updateStaff(id: string, input: unknown) {
       prisma.user.update({
         where: { id },
         data: {
+          centerId: parsed.data.centerId || null,
           name: parsed.data.name,
           email: parsed.data.email.toLowerCase(),
           phone: emptyToNull(parsed.data.phone),

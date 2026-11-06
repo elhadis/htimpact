@@ -11,7 +11,7 @@ export function PendingOfflineChanges({ locale }: { locale: string }) {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [attendance, assignments, participation, enrollments, courses, projects, beneficiaries] = await Promise.all([
+      const [attendance, assignments, participation, enrollments, courses, projects, beneficiaries, cohorts, sessions, activities, centers, transfers] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
         offlineDb.assignmentQueue.toArray(),
         offlineDb.participationQueue.toArray(),
@@ -19,9 +19,19 @@ export function PendingOfflineChanges({ locale }: { locale: string }) {
         offlineDb.courseQueue.toArray(),
         offlineDb.projectQueue.toArray(),
         offlineDb.beneficiaryQueue.toArray(),
+        offlineDb.cohortQueue.toArray(),
+        offlineDb.sessionQueue.toArray(),
+        offlineDb.activityQueue.toArray(),
+        offlineDb.centerQueue.toArray(),
+        offlineDb.transferQueue.toArray(),
       ]);
       if (!active) return;
       setItems([
+        ...centers.map((row) => ({ id: row.clientMutationId, type: locale === "ar" ? "مركز" : "Center", detail: row.values.name })),
+        ...transfers.map((row) => ({ id: row.clientMutationId, type: locale === "ar" ? "طلب نقل" : "Transfer request", detail: row.values.beneficiaryId })),
+        ...cohorts.map((row) => ({ id: row.clientMutationId, type: locale === "ar" ? "مجموعة" : "Cohort", detail: row.values.name })),
+        ...sessions.map((row) => ({ id: row.clientMutationId, type: locale === "ar" ? "جلسة" : "Session", detail: row.values.title })),
+        ...activities.map((row) => ({ id: row.clientMutationId, type: locale === "ar" ? "نشاط" : "Activity", detail: row.values.name })),
         ...attendance.map((row) => ({
           id: row.clientMutationId,
           type: locale === "ar" ? "حضور" : "Attendance",

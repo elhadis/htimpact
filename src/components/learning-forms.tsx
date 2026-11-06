@@ -47,9 +47,10 @@ export function CourseForm({
     <form
       className="grid gap-4 sm:grid-cols-2"
       onSubmit={form.handleSubmit(async (values) => {
+        const pending = { clientMutationId: crypto.randomUUID(), values };
         const queue = async () => {
           try {
-            await offlineDb.courseQueue.put({ clientMutationId: crypto.randomUUID(), values });
+            await offlineDb.courseQueue.put(pending);
             toast.success(t("common.saved"));
           } catch {
             toast.error(t("errors.syncFailed"));
@@ -60,7 +61,7 @@ export function CourseForm({
           return;
         }
         try {
-          const result = await createCourse(values);
+          const result = await createCourse({ ...values, clientMutationId: pending.clientMutationId });
           done(result, `/courses/${result.ok ? result.id : ""}`);
         } catch {
           await queue();
@@ -95,11 +96,11 @@ export function CourseForm({
   );
 }
 
-export function CohortForm({ courses }: { courses: { id: string; name: string; projectName: string }[] }) {
+export function CohortForm({ courses, centers = [] }: { courses: { id: string; name: string; projectName: string }[]; centers?: { id: string; name: string }[] }) {
   const { t, done } = useSave();
   const form = useForm<z.infer<typeof cohortSchema>>({
     resolver: zodResolver(cohortSchema) as Resolver<z.infer<typeof cohortSchema>>,
-    defaultValues: { courseId: courses[0]?.id ?? "", name: "", startDate: "", endDate: "", capacity: "", location: "" },
+    defaultValues: { centerId: centers.length === 1 ? centers[0].id : "", courseId: courses[0]?.id ?? "", name: "", startDate: "", endDate: "", capacity: "", location: "" },
   });
   return (
     <form
@@ -119,13 +120,19 @@ export function CohortForm({ courses }: { courses: { id: string; name: string; p
           return;
         }
         try {
-          const result = await createCohort(values);
+          const result = await createCohort({ ...values, clientMutationId: pending.clientMutationId });
           done(result, `/cohorts/${result.ok ? result.id : ""}`);
         } catch {
           await queue();
         }
       })}
     >
+      <Field label={t("centers.title")} className="sm:col-span-2">
+        <NativeSelect {...form.register("centerId")}>
+          <option value="">{t("centers.unassigned")}</option>
+          {centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}
+        </NativeSelect>
+      </Field>
       <Field label={t("learning.course")} className="sm:col-span-2">
         <NativeSelect {...form.register("courseId")}>
           {courses.map((course) => (
@@ -195,7 +202,7 @@ export function SessionForm({
           return;
         }
         try {
-          const result = await createSession(values);
+          const result = await createSession({ ...values, clientMutationId: pending.clientMutationId });
           done(result, `/attendance/${result.ok ? result.id : ""}`);
         } catch {
           await queue();
@@ -243,11 +250,11 @@ export function SessionForm({
   );
 }
 
-export function ActivityForm({ projectId }: { projectId: string }) {
+export function ActivityForm({ projectId, centers = [] }: { projectId: string; centers?: { id: string; name: string }[] }) {
   const { t, done } = useSave();
   const form = useForm<z.infer<typeof activitySchema>>({
     resolver: zodResolver(activitySchema) as Resolver<z.infer<typeof activitySchema>>,
-    defaultValues: { projectId, name: "", description: "", scheduledAt: "", location: "" },
+    defaultValues: { centerId: centers.length === 1 ? centers[0].id : "", projectId, name: "", description: "", scheduledAt: "", location: "" },
   });
   return (
     <form
@@ -267,13 +274,19 @@ export function ActivityForm({ projectId }: { projectId: string }) {
           return;
         }
         try {
-          const result = await createActivity(values);
+          const result = await createActivity({ ...values, clientMutationId: pending.clientMutationId });
           done(result, `/projects/${projectId}`);
         } catch {
           await queue();
         }
       })}
     >
+      <Field label={t("centers.title")} className="sm:col-span-2">
+        <NativeSelect {...form.register("centerId")}>
+          <option value="">{t("centers.unassigned")}</option>
+          {centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}
+        </NativeSelect>
+      </Field>
       <Field label={t("learning.activityName")}>
         <Input {...form.register("name")} />
       </Field>

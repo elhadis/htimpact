@@ -19,7 +19,9 @@ export default async function NewStaffPage({ params }: { params: Promise<{ local
       <StaffForm
         mode="create"
         projects={options.projects}
+        centers={options.centers}
         defaults={{
+          centerId: options.centers.length === 1 && session.user.role === "CENTER_MANAGER" ? options.centers[0].id : "",
           name: "",
           email: "",
           password: "",

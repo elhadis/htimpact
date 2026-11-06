@@ -1,3 +1,6 @@
+import { currentActor } from "@/lib/center-scope";
+import { can } from "@/lib/rbac";
+import { facilitatorAssigned } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
 import {
@@ -69,6 +72,8 @@ export async function applyAttendanceMutation(
   userId: string,
   mutation: AttendanceMutation,
 ): Promise<MutationResult> {
+  const actor = await currentActor();
+  if (!actor?.active || actor.id !== userId || !can(actor.role.key, "attendance", "update")) return { clientMutationId: mutation.clientMutationId, result: "rejected", rule: "FORBIDDEN", message: "Attendance permission is required." };
   const session = await prisma.session.findUnique({
     where: { id: mutation.sessionId },
     include: {
@@ -77,6 +82,7 @@ export async function applyAttendanceMutation(
     },
   });
 
+  if (session && !await facilitatorAssigned(userId, actor.role.key, session.cohort.course.projectId)) return { clientMutationId: mutation.clientMutationId, result: "rejected", rule: "FORBIDDEN", message: "Project assignment is required." };
   const local = {
     status: mutation.status,
     note: mutation.note,
@@ -108,6 +114,8 @@ export async function applyAttendanceMutation(
     };
   }
 
+  const person = await prisma.beneficiary.findUnique({ where: { id: mutation.beneficiaryId } });
+  if (!person || person.centerId !== session.cohort.centerId) return { clientMutationId: mutation.clientMutationId, result: "rejected", rule: "CENTER_CHANGED", message: "The beneficiary or session center has changed." };
   const enrolled = session.cohort.enrollments.some(
     (row) => row.beneficiaryId === mutation.beneficiaryId && row.status === "active",
   );
@@ -205,6 +213,8 @@ export async function applyAssignmentMutation(
   userId: string,
   mutation: AssignmentMutation,
 ): Promise<MutationResult> {
+  const actor = await currentActor();
+  if (!actor?.active || actor.id !== userId || (!can(actor.role.key, "beneficiaries", "update") && !can(actor.role.key, "cohorts", "update"))) return { clientMutationId: mutation.clientMutationId, result: "rejected", rule: "FORBIDDEN", message: "Beneficiary assignment permission is required." };
   const [project, beneficiary] = await Promise.all([
     prisma.project.findUnique({ where: { id: mutation.projectId } }),
     prisma.beneficiary.findUnique({ where: { id: mutation.beneficiaryId } }),
@@ -219,6 +229,9 @@ export async function applyAssignmentMutation(
     };
   }
 
+  if (beneficiary.centerId && !await prisma.centerProject.findUnique({ where: { centerId_projectId: { centerId: beneficiary.centerId, projectId: mutation.projectId } } })) {
+    return { clientMutationId: mutation.clientMutationId, result: "rejected", rule: "CENTER_PROJECT_MISMATCH", message: "This project is not available at the beneficiary's center." };
+  }
   const current = await prisma.projectBeneficiary.findUnique({
     where: {
       projectId_beneficiaryId: {
@@ -326,6 +339,10 @@ export async function forceResolveConflict(userId: string, conflictId: string, c
       const payload = conflict.localPayload as AttendanceMutation;
       const session = await prisma.session.findUnique({ where: { id: payload.sessionId } });
       if (!session) return { ok: false as const, error: "notFound" as const };
+      const person = await prisma.beneficiary.findUnique({ where: { id: payload.beneficiaryId } });
+      const cohort = await prisma.cohort.findUnique({ where: { id: session.cohortId } });
+      const enrolled = await prisma.cohortEnrollment.findFirst({ where: { cohortId: session.cohortId, beneficiaryId: payload.beneficiaryId, status: "active" } });
+      if (!person || !cohort || person.centerId !== cohort.centerId || !enrolled) return { ok: false as const, error: "forbidden" as const };
       await prisma.attendanceRecord.upsert({
         where: {
           sessionId_beneficiaryId: {
@@ -354,6 +371,9 @@ export async function forceResolveConflict(userId: string, conflictId: string, c
       });
     } else {
       const payload = conflict.localPayload as AssignmentMutation;
+      const person = await prisma.beneficiary.findUnique({ where: { id: payload.beneficiaryId } });
+      const project = await prisma.project.findUnique({ where: { id: payload.projectId } });
+      if (!person || !project || (person.centerId && !await prisma.centerProject.findUnique({ where: { centerId_projectId: { centerId: person.centerId, projectId: project.id } } }))) return { ok: false as const, error: "forbidden" as const };
       if (payload.op === "ASSIGN") {
         await prisma.projectBeneficiary.upsert({
           where: {

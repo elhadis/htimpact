@@ -145,7 +145,7 @@ export default async function ProjectDetailPage({
             ))
           ) : (
             <div className="space-y-6">
-              {can(session.user.role, "activities", "create") ? <ActivityForm projectId={project.id} /> : null}
+              {can(session.user.role, "activities", "create") ? <ActivityForm projectId={project.id} centers={options.centers.filter((center) => center.projects.some((link) => link.projectId === project.id))} /> : null}
               {project.activities.map((activity) => (
                 <section key={activity.id} className="rounded-xl border bg-card p-4">
                   <h2 className="font-semibold">{activity.name}</h2>

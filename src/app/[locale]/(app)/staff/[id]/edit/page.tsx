@@ -23,7 +23,9 @@ export default async function EditStaffPage({ params }: { params: Promise<{ loca
         mode="edit"
         userId={user.id}
         projects={options.projects}
+        centers={options.centers}
         defaults={{
+          centerId: user.centerId ?? "",
           name: user.name,
           email: user.email,
           role: user.role.key,

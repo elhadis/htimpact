@@ -8,13 +8,13 @@ import { PageHeader } from "@/components/chrome";
 import { Forbidden } from "@/components/forbidden";
 import { ProjectsTable } from "@/components/lists";
 
-export default async function ProjectsPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function ProjectsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ status?: string; active?: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const session = await auth();
   if (!session?.user || !can(session.user.role, "projects", "read")) return <Forbidden />;
   const t = await getTranslations();
-  const rows = await listProjects();
+  const rows = await listProjects((await searchParams).status === "active");
   return (
     <div>
       <PageHeader

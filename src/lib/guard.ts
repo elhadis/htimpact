@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { currentActor } from "@/lib/center-scope";
 import { prisma } from "@/lib/prisma";
 import { can, type PermissionAction, type Resource } from "@/lib/rbac";
 
@@ -7,7 +8,10 @@ export async function guard(resource: Resource, action: PermissionAction) {
   if (!session?.user?.id || session.user.active === false) {
     return { ok: false as const, error: "auth" as const, session: null };
   }
-  if (!can(session.user.role, resource, action)) {
+  const actor = await currentActor();
+  if (!actor?.active) return { ok: false as const, error: "auth" as const, session: null };
+  session.user.role = actor.role.key as typeof session.user.role;
+  if (!can(actor.role.key, resource, action)) {
     return { ok: false as const, error: "forbidden" as const, session };
   }
   return { ok: true as const, error: null, session };

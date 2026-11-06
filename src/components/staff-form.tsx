@@ -12,7 +12,7 @@ import { staffSchema, staffUpdateSchema } from "@/lib/validators";
 import { createStaff, updateStaff } from "@/server/mutations";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { Input, NativeSelect } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Field } from "@/components/chrome";
 import type { z } from "zod";
@@ -25,11 +25,13 @@ export function StaffForm({
   userId,
   defaults,
   projects,
+  centers = [],
 }: {
   mode: "create" | "edit";
   userId?: string;
   defaults: CreateValues | EditValues;
   projects: { id: string; name: string; code: string }[];
+  centers?: { id: string; name: string; projects: { projectId: string }[] }[];
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -54,6 +56,13 @@ export function StaffForm({
   return (
     <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={t("centers.title")}>
+          <NativeSelect {...form.register("centerId")} disabled={false}>
+            <option value="">{t("centers.unassigned")}</option>
+            {centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}
+          </NativeSelect>
+
+        </Field>
         <Field label={t("staff.name")}>
           <Input {...form.register("name")} />
         </Field>

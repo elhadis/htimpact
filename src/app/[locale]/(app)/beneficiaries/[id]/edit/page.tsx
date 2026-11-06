@@ -28,7 +28,9 @@ export default async function EditBeneficiaryPage({
         mode="edit"
         beneficiaryId={person.id}
         projects={options.projects}
+        centers={options.centers}
         defaults={{
+          centerId: person.centerId ?? "",
           firstName: person.firstName,
           lastName: person.lastName,
           gender: person.gender,
