@@ -16,7 +16,16 @@ const child = spawn("npx", ["next", ...args], {
   shell: true,
 });
 
-child.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
+child.on("exit", async (code, signal) => {
+  if (signal) { process.kill(process.pid, signal); return; }
+  if (code === 0 && args[0] === "build") {
+    try {
+      const { writeOfflineAssets } = await import("./offline-assets.mjs");
+      await writeOfflineAssets();
+    } catch (error) {
+      console.error("Offline manifest generation failed:", error);
+      process.exit(1);
+    }
+  }
   process.exit(code ?? 1);
 });

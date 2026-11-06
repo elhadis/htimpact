@@ -26,7 +26,15 @@ export function OfflineBoundary({ scope, locale, children }: { scope: string; lo
       if (!("serviceWorker" in navigator)) return;
       const registration = await navigator.serviceWorker.ready;
       const worker = navigator.serviceWorker.controller ?? registration.active;
-      worker?.postMessage({ type: "SET_SCOPE", scope });
+      if (worker) {
+        await new Promise<void>((resolve) => {
+          const channel = new MessageChannel();
+          const timer = window.setTimeout(() => { channel.port1.close(); resolve(); }, 4000);
+          channel.port1.onmessage = () => { window.clearTimeout(timer); channel.port1.close(); resolve(); };
+          worker.postMessage({ type: "SET_SCOPE", scope }, [channel.port2]);
+        });
+        if (navigator.onLine) worker.postMessage({ type: "PREPARE_PAGES", scope, locale });
+      }
       // Fetch a complete document, never a partial RSC response, for offline reloads.
       // Both language versions are prepared after an authenticated online visit.
       if (navigator.onLine) {
@@ -35,6 +43,8 @@ export function OfflineBoundary({ scope, locale, children }: { scope: string; lo
     }
     void initialize();
     const onOnline = () => { void initialize(); };
+    const onSynced = () => navigator.serviceWorker?.controller?.postMessage({ type: "PREPARE_PAGES", scope, locale, force: true });
+    window.addEventListener("ht-data-synced", onSynced);
     window.addEventListener("online", onOnline);
     navigator.serviceWorker?.addEventListener("controllerchange", onOnline);
     const offlineNavigation = (event: MouseEvent) => {
@@ -46,7 +56,7 @@ export function OfflineBoundary({ scope, locale, children }: { scope: string; lo
       event.preventDefault(); event.stopPropagation(); location.assign(url.href);
     };
     document.addEventListener("click", offlineNavigation, true);
-    return () => { alive = false; window.removeEventListener("online", onOnline); navigator.serviceWorker?.removeEventListener("controllerchange", onOnline); document.removeEventListener("click", offlineNavigation, true); };
+    return () => { alive = false; window.removeEventListener("online", onOnline); navigator.serviceWorker?.removeEventListener("controllerchange", onOnline); window.removeEventListener("ht-data-synced", onSynced); document.removeEventListener("click", offlineNavigation, true); };
   }, [scope, locale, pathname]);
   return ready ? children : <div className="min-h-dvh bg-background" aria-busy="true" />;
 }

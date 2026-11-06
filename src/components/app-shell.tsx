@@ -69,6 +69,8 @@ export function AppShell({
   const [queued, setQueued] = useState(0);
   const [queueMode, setQueueMode] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pagePreparation, setPagePreparation] = useState<{ completed: number; total: number; stage: string } | null>(null);
+  const readinessAnnounced = useRef(false);
   const syncInProgress = useRef(false);
 
   async function refreshQueue() {
@@ -235,6 +237,7 @@ export function AppShell({
       if (failed || rejected) toast.error(t("errors.syncFailed"));
       else toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
       router.refresh();
+      window.dispatchEvent(new Event("ht-data-synced"));
     } catch {
       toast.error(t("errors.syncFailed"));
     } finally {
@@ -265,47 +268,20 @@ export function AppShell({
 
 
   useEffect(() => {
-    if (!navigator.onLine || !("serviceWorker" in navigator)) return;
-    let stopped = false;
-    const timer = window.setTimeout(async () => {
-      await navigator.serviceWorker.ready;
-      if (!navigator.serviceWorker.controller) return;
-      const scope = localStorage.getItem("ht-active-scope");
-      if (!scope) return;
-      const routes = links.filter((link) => !link.resource || can(user.role, link.resource, "read")).map((link) => link.href);
-      for (const resource of ["beneficiaries", "courses", "cohorts", "sessions", "staff", "projects", "centers"] as const) {
-        if (can(user.role, resource, "create")) routes.push(`/${resource}/new`);
+    function onPreparation(event: MessageEvent) {
+      const data = event.data;
+      if (data?.type !== "OFFLINE_PREPARATION" || data.scope !== localStorage.getItem("ht-active-scope")) return;
+      setPagePreparation({ completed: data.completed, total: data.total, stage: data.stage });
+      if (data.stage === "preparing") readinessAnnounced.current = false;
+      if (data.stage === "ready" && !readinessAnnounced.current) {
+        readinessAnnounced.current = true;
+        toast.success(t("sync.pagesReady"));
       }
-      const urls = new Set(routes.flatMap((route) => ["en", "ar"].map((language) => `/${language}${route}`)));
-      document.querySelectorAll<HTMLAnchorElement>("main a[href]").forEach((anchor) => {
-        const url = new URL(anchor.href);
-        if (url.origin === location.origin && /^\/(en|ar)\//.test(url.pathname)) urls.add(url.pathname + url.search);
-      });
-      const pending = [...urls];
-      async function worker() {
-        while (pending.length && !stopped && navigator.onLine) {
-          const href = pending.shift()!;
-          try {
-            const response = await fetch(href, { headers: { "X-HT-Offline-Scope": scope! }, cache: "no-store" });
-            if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) continue;
-            const html = await response.text();
-            const doc = new DOMParser().parseFromString(html, "text/html");
-            const assets = new Set<string>();
-            doc.querySelectorAll("script[src], link[rel=stylesheet], link[as=font]").forEach((element) => {
-              const asset = new URL(element.getAttribute("src") ?? element.getAttribute("href") ?? "", location.origin);
-              if (asset.origin === location.origin && asset.pathname.startsWith("/_next/static/")) assets.add(asset.href);
-            });
-            for (const asset of assets) {
-              if (stopped || !navigator.onLine) break;
-              await fetch(asset).catch(() => undefined);
-            }
-          } catch { /* A failed warm-up never discards queued work. */ }
-        }
-      }
-      await Promise.all([worker(), worker()]);
-    }, 1200);
-    return () => { stopped = true; window.clearTimeout(timer); };
-  }, [pathname, locale, user.role]);
+      if (data.stage === "incomplete") toast.error(t("sync.pagesIncomplete"));
+    }
+    navigator.serviceWorker?.addEventListener("message", onPreparation);
+    return () => navigator.serviceWorker?.removeEventListener("message", onPreparation);
+  }, [t]);
 
   function toggleQueue() {
     const next = !queueMode;
@@ -378,7 +354,7 @@ export function AppShell({
               )}
             >
               {online && !queueMode ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
-              {queueMode ? t("sync.queueOn") : online ? t("common.online") : t("common.offline")}
+              {queueMode ? t("sync.queueOn") : online && pagePreparation?.stage === "preparing" ? `${t("sync.preparingPages")} ${pagePreparation.completed}/${pagePreparation.total}` : online ? t("common.online") : t("common.offline")}
               {queued > 0 ? <span className="font-semibold text-primary">{queued}</span> : null}
             </button>
             {queued > 0 ? (

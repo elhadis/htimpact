@@ -303,7 +303,10 @@
     "rule4": "A field mark outside the session window never overwrites the server.",
     "rule5": "If both marks were taken during the session and they disagree, the server value stays until someone chooses.",
     "rule6": "Project assignment never copies a person. A new link is created, an existing active link is left as-is, and a withdraw is blocked when server notes changed or the device has no base version.",
-    "queued": "Saved locally, awaiting sync"
+    "queued": "Saved locally, awaiting sync",
+    "preparingPages": "Preparing offline",
+    "pagesReady": "Pages are ready for offline use.",
+    "pagesIncomplete": "Some pages could not be saved. Stay online and reopen the page to complete preparation."
   },
   "centers": {
     "title": "Centers",

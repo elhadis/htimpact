@@ -32,7 +32,10 @@ export function LanguageSwitcher({ inverted = false }: { inverted?: boolean }) {
                 ? "text-white/80"
                 : "text-muted-foreground",
           )}
-          onClick={() => router.replace(pathname, { locale: item })}
+          onClick={() => {
+            if (!navigator.onLine) window.location.assign(`/${item}${pathname}${window.location.search}${window.location.hash}`);
+            else router.replace(pathname, { locale: item });
+          }}
         >
           {item === "en" ? "EN" : "عربي"}
         </button>
