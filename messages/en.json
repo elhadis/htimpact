@@ -327,6 +327,8 @@
     "reviewOnline": "Transfer review requires an internet connection to verify the current center.",
     "PENDING": "Pending approval",
     "APPROVED": "Approved",
-    "REJECTED": "Rejected"
+    "REJECTED": "Rejected",
+    "noBeneficiaries": "No beneficiaries available",
+    "assignBeforeTransfer": "This beneficiary has no center. Assign the current center in their record before requesting a transfer."
   }
 }

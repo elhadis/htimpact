@@ -6,6 +6,7 @@ let activeScope = null;
 let scopeChange = Promise.resolve();
 const scopeByClient = new Map();
 const pageCache = (scope) => `ht-impact-pages-v4-${encodeURIComponent(scope)}`;
+const isLaunchPage = (url) => /^\/(en|ar)?\/?$/.test(url.pathname);
 const isAppPage = (url) => /^\/(en|ar)\/(dashboard|centers|transfers|projects|beneficiaries|courses|cohorts|sessions|attendance|activities|staff|reports|audit|sync)(\/|$)/.test(url.pathname);
 
 async function getScope(clientId) {
@@ -67,6 +68,27 @@ self.addEventListener("fetch", (event) => {
     })()); return;
   }
   if (request.headers.has("RSC") || url.searchParams.has("_rsc") || url.pathname.startsWith("/_next/")) return;
+  // Installed copies can still launch at /en (or /). These entry routes
+  // normally need a server redirect, so resolve them locally when offline.
+  if (isLaunchPage(url) && request.mode === "navigate") {
+    event.respondWith((async () => {
+      try { return await fetch(request); }
+      catch {
+        const scope = await getScope(event.clientId);
+        if (scope) {
+          const locale = url.pathname.match(/^\/(en|ar)(?:\/|$)/)?.[1] || "en";
+          const dashboard = new URL(`/${locale}/dashboard`, self.location.origin).href;
+          const cache = await caches.open(pageCache(scope));
+          if (await cache.match(dashboard)) {
+            if (event.resultingClientId) scopeByClient.set(event.resultingClientId, scope);
+            return Response.redirect(dashboard, 302);
+          }
+        }
+        return await caches.match("/offline.html") || Response.error();
+      }
+    })());
+    return;
+  }
   if (isAppPage(url) && (request.mode === "navigate" || request.headers.has("X-HT-Offline-Scope"))) {
     event.respondWith((async () => {
       const scope = request.headers.get("X-HT-Offline-Scope") || await getScope(event.clientId);

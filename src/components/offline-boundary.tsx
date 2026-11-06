@@ -36,6 +36,7 @@ export function OfflineBoundary({ scope, locale, children }: { scope: string; lo
     void initialize();
     const onOnline = () => { void initialize(); };
     window.addEventListener("online", onOnline);
+    navigator.serviceWorker?.addEventListener("controllerchange", onOnline);
     const offlineNavigation = (event: MouseEvent) => {
       if (navigator.onLine || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       const target = (event.target as Element)?.closest("a");
@@ -45,7 +46,7 @@ export function OfflineBoundary({ scope, locale, children }: { scope: string; lo
       event.preventDefault(); event.stopPropagation(); location.assign(url.href);
     };
     document.addEventListener("click", offlineNavigation, true);
-    return () => { alive = false; window.removeEventListener("online", onOnline); document.removeEventListener("click", offlineNavigation, true); };
+    return () => { alive = false; window.removeEventListener("online", onOnline); navigator.serviceWorker?.removeEventListener("controllerchange", onOnline); document.removeEventListener("click", offlineNavigation, true); };
   }, [scope, locale, pathname]);
   return ready ? children : <div className="min-h-dvh bg-background" aria-busy="true" />;
 }

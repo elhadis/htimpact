@@ -11,7 +11,7 @@ export default async function Transfers({ params, searchParams }: { params: Prom
   const t = await getTranslations();
   const pendingOnly = (await searchParams).status === "PENDING";
   const [people, destinations, transfers] = await Promise.all([
-    prisma.beneficiary.findMany({ where: { centerId: { not: null } }, select: { id: true, firstName: true, lastName: true, code: true, centerId: true }, orderBy: { lastName: "asc" } }),
+    prisma.beneficiary.findMany({ select: { id: true, firstName: true, lastName: true, code: true, centerId: true }, orderBy: { lastName: "asc" } }),
     // Destination names are the only cross-center information exposed to managers.
     rawPrisma.center.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.centerTransfer.findMany({ where: pendingOnly ? { status: "PENDING" } : undefined, include: { beneficiary: { select: { code: true, firstName: true, lastName: true } }, fromCenter: { select: { name: true } }, toCenter: { select: { name: true } } }, orderBy: { createdAt: "desc" } }),

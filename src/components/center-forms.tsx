@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { saveCenter, requestTransfer, reviewTransfer } from "@/server/centers";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
@@ -67,10 +67,11 @@ export function TransferForm({ people, destinations }: {
   const [destination, setDestination] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const person = people.find((row) => row.id === personId);
+  const selectedPersonId = people.some((row) => row.id === personId) ? personId : people[0]?.id ?? "";
+  const person = people.find((row) => row.id === selectedPersonId);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const values: z.infer<typeof transferSchema> = { id: crypto.randomUUID(), beneficiaryId: personId, fromCenterId: person?.centerId ?? "", toCenterId: destination, reason };
+    const values: z.infer<typeof transferSchema> = { id: crypto.randomUUID(), beneficiaryId: selectedPersonId, fromCenterId: person?.centerId ?? "", toCenterId: destination, reason };
     if (!transferSchema.safeParse(values).success) { toast.error(t("errors.invalid")); return; }
     const queue = async () => { await offlineDb.transferQueue.put({ clientMutationId: values.id, values }); toast.success(t("sync.queued")); };
     setBusy(true);
@@ -83,7 +84,7 @@ export function TransferForm({ people, destinations }: {
     finally { setBusy(false); }
   }
   return <form className="grid gap-4 rounded-xl border bg-card p-4 sm:grid-cols-2" onSubmit={submit}>
-    <Field label={t("beneficiaries.name")}><NativeSelect value={personId} onChange={(e) => { setPersonId(e.target.value); setDestination(""); }}>{people.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}</NativeSelect></Field>
+    <Field label={t("beneficiaries.name")}><NativeSelect value={selectedPersonId} onChange={(e) => { setPersonId(e.target.value); setDestination(""); }}>{people.length === 0 && <option value="">{t("centers.noBeneficiaries")}</option>}{people.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name}{!row.centerId ? ` · ${t("centers.unassigned")}` : ""}</option>)}</NativeSelect>{person && !person.centerId && <p className="text-xs text-muted-foreground">{t("centers.assignBeforeTransfer")} <Link className="text-teal underline" href={`/beneficiaries/${person.id}/edit`}>{t("common.edit")}</Link></p>}</Field>
     <Field label={t("centers.destination")}><NativeSelect required value={destination} onChange={(e) => setDestination(e.target.value)}><option value="">{t("common.select")}</option>{destinations.filter((row) => row.id !== person?.centerId).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</NativeSelect></Field>
     <Field className="sm:col-span-2" label={t("centers.reason")}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
     <Button disabled={busy || !person?.centerId || !destination}>{t("centers.request")}</Button>
