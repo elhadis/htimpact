@@ -214,7 +214,7 @@ export async function applyAssignmentMutation(
   mutation: AssignmentMutation,
 ): Promise<MutationResult> {
   const actor = await currentActor();
-  if (!actor?.active || actor.id !== userId || (!can(actor.role.key, "beneficiaries", "update") && !can(actor.role.key, "cohorts", "update"))) return { clientMutationId: mutation.clientMutationId, result: "rejected", rule: "FORBIDDEN", message: "Beneficiary assignment permission is required." };
+  if (!actor?.active || actor.id !== userId || (!can(actor.role.key, "assignments", "update") && !can(actor.role.key, "cohorts", "update"))) return { clientMutationId: mutation.clientMutationId, result: "rejected", rule: "FORBIDDEN", message: "Beneficiary assignment permission is required." };
   const [project, beneficiary] = await Promise.all([
     prisma.project.findUnique({ where: { id: mutation.projectId } }),
     prisma.beneficiary.findUnique({ where: { id: mutation.beneficiaryId } }),

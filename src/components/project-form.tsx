@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
 import { projectSchema, projectStatuses, type ProjectInput } from "@/lib/validators";
 import { metricsForType } from "@/lib/progress";
-import { createProject, updateProject } from "@/server/mutations";
+import { createProject } from "@/server/mutations";
+import { applyAdminOperation } from "@/server/admin-records";
 import { Button } from "@/components/ui/button";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
@@ -26,10 +27,12 @@ const metricUnits: Record<string, string> = {
 export function ProjectForm({
   mode,
   projectId,
+  updatedAt,
   defaults,
 }: {
   mode: "create" | "edit";
   projectId?: string;
+  updatedAt?: string;
   defaults: ProjectInput;
 }) {
   const t = useTranslations();
@@ -76,14 +79,15 @@ export function ProjectForm({
       }
       return;
     }
-    const result = await updateProject(projectId ?? "", values);
-    if (!result.ok) {
-      toast.error(t.has(`errors.${result.error}`) ? t(`errors.${result.error}`) : t("errors.invalid"));
-      return;
-    }
-    toast.success(t("common.saved"));
-    router.push(`/projects/${result.id}`);
-    router.refresh();
+    const pending = { clientMutationId: crypto.randomUUID(), kind: "update" as const, entity: "projects" as const, entityId: projectId ?? "", label: values.name, baseUpdatedAt: updatedAt ?? "", values: values };
+    const queue = async () => { await offlineDb.adminQueue.put(pending); toast.success(t("adminRecords.updateQueued")); };
+    try {
+      if (queueModeEnabled()) { await queue(); return; }
+      const result = await applyAdminOperation(pending);
+      if (!result.ok) { toast.error(t(`errors.${result.error}`)); return; }
+      toast.success(t("common.saved")); router.push(`/projects/${projectId}`); router.refresh();
+      window.dispatchEvent(new Event("ht-data-synced"));
+    } catch { try { await queue(); } catch { toast.error(t("errors.syncFailed")); } }
   }
 
   return (

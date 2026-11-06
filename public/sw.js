@@ -90,6 +90,10 @@ async function prepareSnapshots(scope, force = false, locale = "en") {
         await staticCache.put(asset, response);
       });
       const cache = await caches.open(pageCache(scope));
+      const allowedPages = new Set(pages.map(pageKey));
+      for (const saved of await cache.keys()) {
+        if (/^\/(en|ar)\/(beneficiaries|projects|courses)\/[^/]+\/edit$/.test(new URL(saved.url).pathname) && !allowedPages.has(pageKey(saved))) await cache.delete(saved);
+      }
       await batch(pages, 2, async (path) => {
         const url = new URL(path, self.location.origin);
         if (!isAppPage(url)) return;

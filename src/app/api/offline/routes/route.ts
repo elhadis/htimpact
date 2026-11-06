@@ -34,7 +34,7 @@ export async function GET() {
     paths.add(`/beneficiaries/${person.id}`);
     if (can(role, "beneficiaries", "update")) paths.add(`/beneficiaries/${person.id}/edit`);
   }
-  for (const course of courses) paths.add(`/courses/${course.id}`);
+  for (const course of courses) { paths.add(`/courses/${course.id}`); if (can(role, "courses", "update")) paths.add(`/courses/${course.id}/edit`); }
   for (const cohort of cohorts) paths.add(`/cohorts/${cohort.id}`);
   for (const session of sessions) paths.add(`/attendance/${session.id}`);
   for (const person of staff) paths.add(`/staff/${person.id}/edit`);

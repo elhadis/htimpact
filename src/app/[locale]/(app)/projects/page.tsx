@@ -28,7 +28,7 @@ export default async function ProjectsPage({ params, searchParams }: { params: P
           ) : null
         }
       />
-      <ProjectsTable rows={rows} />
+      <ProjectsTable admin={session.user.role === "ADMIN"} rows={rows} />
     </div>
   );
 }

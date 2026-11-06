@@ -292,7 +292,7 @@ export async function updateBeneficiary(id: string, input: unknown) {
 }
 
 export async function assignBeneficiary(input: unknown) {
-  const access = await guard("beneficiaries", "update");
+  const access = await guard("assignments", "update");
   if (!access.ok) return fail(access.error);
   const parsed = assignmentMutationSchema.safeParse(input);
   if (!parsed.success) return fail("invalid");

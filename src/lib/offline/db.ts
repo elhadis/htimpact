@@ -63,7 +63,10 @@ export type CachedRoster = {
 export type QueuedCenter = { clientMutationId: string; values: z.infer<typeof centerSchema> };
 export type QueuedTransfer = { clientMutationId: string; values: z.infer<typeof transferSchema> };
 
+export type QueuedAdminOperation = { clientMutationId: string; kind: "delete" | "update"; entity: "beneficiaries" | "projects" | "courses"; entityId: string; label: string; baseUpdatedAt: string; values?: unknown };
+
 class ImpactDB extends Dexie {
+  adminQueue!: Table<QueuedAdminOperation, string>;
   centerQueue!: Table<QueuedCenter, string>;
   transferQueue!: Table<QueuedTransfer, string>;
   attendanceQueue!: Table<QueuedAttendance, string>;
@@ -125,7 +128,8 @@ class ImpactDB extends Dexie {
       projectQueue: "clientMutationId",
       beneficiaryQueue: "clientMutationId",
     });
-    this.version(8).stores({
+    this.version(9).stores({
+      adminQueue: "clientMutationId, entity, entityId",
       centerQueue: "clientMutationId",
       transferQueue: "clientMutationId",
       attendanceQueue: "clientMutationId, sessionId, beneficiaryId",

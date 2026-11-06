@@ -26,6 +26,7 @@ export default async function EditBeneficiaryPage({
       <PageHeader title={t("beneficiaries.edit")} description={`${person.firstName} ${person.lastName}`} />
       <BeneficiaryForm
         mode="edit"
+        updatedAt={person.updatedAt.toISOString()}
         beneficiaryId={person.id}
         projects={options.projects}
         centers={options.centers}

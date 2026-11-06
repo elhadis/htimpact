@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
 import { activitySchema, cohortSchema, courseSchema, sessionSchema } from "@/lib/validators";
 import { createActivity, createCohort, createCourse, createSession, enrollBeneficiary } from "@/server/mutations";
+import { applyAdminOperation } from "@/server/admin-records";
 import { Button } from "@/components/ui/button";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
@@ -34,19 +35,30 @@ function useSave() {
 }
 
 export function CourseForm({
-  projects,
+  projects, defaults, courseId, updatedAt,
 }: {
+  defaults?: z.infer<typeof courseSchema>; courseId?: string; updatedAt?: string;
   projects: { id: string; name: string; code: string }[];
 }) {
   const { t, done } = useSave();
   const form = useForm<z.infer<typeof courseSchema>>({
     resolver: zodResolver(courseSchema) as Resolver<z.infer<typeof courseSchema>>,
-    defaultValues: { projectId: projects[0]?.id ?? "", code: "", name: "", description: "", hours: "" },
+    defaultValues: defaults ?? { projectId: projects[0]?.id ?? "", code: "", name: "", description: "", hours: "" },
   });
   return (
     <form
       className="grid gap-4 sm:grid-cols-2"
       onSubmit={form.handleSubmit(async (values) => {
+        if (courseId) {
+          const pending = { clientMutationId: crypto.randomUUID(), kind: "update" as const, entity: "courses" as const, entityId: courseId, label: values.name, baseUpdatedAt: updatedAt ?? "", values };
+          const queue = async () => { await offlineDb.adminQueue.put(pending); toast.success(t("adminRecords.updateQueued")); };
+          try {
+            if (queueModeEnabled()) { await queue(); return; }
+            const result = await applyAdminOperation(pending);
+            done(result, `/courses/${courseId}`); window.dispatchEvent(new Event("ht-data-synced"));
+          } catch { try { await queue(); } catch { toast.error(t("errors.syncFailed")); } }
+          return;
+        }
         const pending = { clientMutationId: crypto.randomUUID(), values };
         const queue = async () => {
           try {

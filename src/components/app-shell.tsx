@@ -25,6 +25,8 @@ import {
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
 import { offlineDb, type QueuedAttendance, type QueuedAssignment, type QueuedParticipation, type QueuedEnrollment, type QueuedCourse, type QueuedProject, type QueuedBeneficiary, type QueuedCohort, type QueuedSession, type QueuedActivity, type QueuedCenter, type QueuedTransfer } from "@/lib/offline/db";
+import { invalidateDeletedRecord } from "@/lib/offline/admin-records";
+import { applyAdminOperation } from "@/server/admin-records";
 import { saveCenter, requestTransfer } from "@/server/centers";
 import { readSyncScope, recordSyncOutcome } from "@/lib/offline/sync-status";
 import { clearOfflinePages } from "@/components/offline-boundary";
@@ -88,7 +90,7 @@ export function AppShell({
       offlineDb.sessionQueue.count(),
       offlineDb.activityQueue.count(),
     ]) as [number, number, number, number, number, number, number, number, number, number];
-    const extra = await offlineDb.centerQueue.count() + await offlineDb.transferQueue.count();
+    const extra = await offlineDb.centerQueue.count() + await offlineDb.transferQueue.count() + await offlineDb.adminQueue.count();
     setQueued(extra + attendance + assignments + participation + enrollments + courses + projects + beneficiaries + cohorts + sessions + activities);
     setOnline(navigator.onLine);
     setQueueMode(localStorage.getItem("ht-queue-mode") === "1");
@@ -110,6 +112,7 @@ export function AppShell({
     let activities: QueuedActivity[];
     let centers: QueuedCenter[];
     let transfers: QueuedTransfer[];
+    let admin: import("@/lib/offline/db").QueuedAdminOperation[];
     try {
       [attendance, assignments, participation, enrollments, courses, projects, beneficiaries, cohorts, sessions, activities] = await Promise.all([
         offlineDb.attendanceQueue.toArray(),
@@ -125,13 +128,14 @@ export function AppShell({
       ]) as [QueuedAttendance[], QueuedAssignment[], QueuedParticipation[], QueuedEnrollment[], QueuedCourse[], QueuedProject[], QueuedBeneficiary[], QueuedCohort[], QueuedSession[], QueuedActivity[]];
       centers = await offlineDb.centerQueue.toArray();
       transfers = await offlineDb.transferQueue.toArray();
+      admin = await offlineDb.adminQueue.toArray();
     } catch {
       syncInProgress.current = false;
       recordSyncOutcome("incomplete", syncScope);
       toast.error(t("errors.syncFailed"));
       return;
     }
-    if (centers.length + transfers.length + attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length + beneficiaries.length + cohorts.length + sessions.length + activities.length === 0) {
+    if (admin.length + centers.length + transfers.length + attendance.length + assignments.length + participation.length + enrollments.length + courses.length + projects.length + beneficiaries.length + cohorts.length + sessions.length + activities.length === 0) {
       syncInProgress.current = false;
       return;
     }
@@ -237,6 +241,13 @@ export function AppShell({
       for (const mutation of transfers) {
         try { const saved = await requestTransfer(mutation.values); if (saved.ok) await offlineDb.transferQueue.delete(mutation.clientMutationId); else failed = true; }
         catch { failed = true; }
+      }
+      for (const mutation of admin) {
+        try {
+          const saved = await applyAdminOperation(mutation);
+          if (saved.ok) { if (mutation.kind === "delete") await invalidateDeletedRecord(mutation.entity, mutation.entityId); await offlineDb.adminQueue.delete(mutation.clientMutationId); }
+          else { failed = true; toast.error(t(`errors.${saved.error}`)); }
+        } catch { failed = true; }
       }
       recordSyncOutcome(failed || rejected ? "incomplete" : conflicts ? "conflicts" : "success", syncScope);
       if (failed || rejected) toast.error(t("errors.syncFailed"));

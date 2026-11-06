@@ -104,6 +104,7 @@ export async function listProjects(activeOnly = false) {
   });
   return projects.map((project) => ({
     id: project.id,
+    updatedAt: project.updatedAt.toISOString(),
     code: project.code,
     name: project.name,
     type: project.type as ProjectType,
@@ -167,6 +168,7 @@ export async function listBeneficiaries() {
   });
   return people.map((person) => ({
     id: person.id,
+    updatedAt: person.updatedAt.toISOString(),
     code: person.code,
     name: `${person.firstName} ${person.lastName}`,
     gender: person.gender,

@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminRecordActions } from "@/components/admin-record-actions";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -19,9 +20,11 @@ function useLabels() {
 }
 
 export function ProjectsTable({
-  rows,
+  rows, admin = false,
 }: {
+  admin?: boolean;
   rows: {
+    updatedAt: string;
     id: string;
     code: string;
     name: string;
@@ -59,13 +62,15 @@ export function ProjectsTable({
       ),
     },
   ];
+  if (admin) columns.push({ id: "admin-actions", header: "", enableGlobalFilter: false, cell: ({ row }) => <AdminRecordActions entity="projects" id={row.original.id} label={row.original.name} updatedAt={row.original.updatedAt} /> });
   return <DataTable columns={columns} data={rows} labels={useLabels()} />;
 }
 
 export function BeneficiariesTable({
-  rows,
+  rows, admin = false,
 }: {
-  rows: { id: string; code: string; name: string; gender: string; community: string | null; projects: string; projectCount: number }[];
+  admin?: boolean;
+  rows: { updatedAt: string; id: string; code: string; name: string; gender: string; community: string | null; projects: string; projectCount: number }[];
 }) {
   const t = useTranslations();
   const columns: ColumnDef<(typeof rows)[number]>[] = [
@@ -86,6 +91,7 @@ export function BeneficiariesTable({
       ),
     },
   ];
+  if (admin) columns.push({ id: "admin-actions", header: "", enableGlobalFilter: false, cell: ({ row }) => <AdminRecordActions entity="beneficiaries" id={row.original.id} label={row.original.name} updatedAt={row.original.updatedAt} /> });
   return <DataTable columns={columns} data={rows} labels={useLabels()} />;
 }
 

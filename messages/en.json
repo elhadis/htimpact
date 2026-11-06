@@ -89,7 +89,9 @@
     "transferPending": "A transfer is pending or the beneficiary’s center has changed.",
     "transferChanged": "The transfer details changed. Refresh the page.",
     "transferRequired": "Use a transfer request to change the center.",
-    "centerRequired": "Select a center for the beneficiary."
+    "centerRequired": "Select a center for the beneficiary.",
+    "linkedRecords": "This record has protected operational, attendance or transfer links and cannot be deleted. All data was retained.",
+    "staleRecord": "The record changed since it was opened. Refresh and review it before retrying."
   },
   "roles": {
     "ADMIN": "Administrator",
@@ -366,5 +368,14 @@
     "lastAttemptConflicts": "The last sync attempt produced conflicts that need review.",
     "openSync": "Open synchronization",
     "loading": "Reading local operations…"
+  },
+  "adminRecords": {
+    "delete": "Delete",
+    "confirmDelete": "Permanently delete “{name}” from the database? This cannot be undone after execution. Protected linked records prevent deletion.",
+    "deleteQueued": "Deletion request saved locally. The database record remains until sync succeeds and permissions and links are checked.",
+    "updateQueued": "Update request saved locally, awaiting sync.",
+    "deleted": "Deleted from the database.",
+    "editCourse": "Edit course",
+    "cancel": "Cancel request"
   }
 }

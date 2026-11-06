@@ -46,7 +46,7 @@ export function QualityOverview({ data, locale, centerOnly }: { data: QualityDat
     { id: "conflicts", label: t("conflicts"), count: data.conflictCount },
   ];
   const empty = <p className="text-sm text-muted-foreground">{t("noItems")}</p>;
-  const personRows = (people: QualityData["missingCenter"]) => people.length ? <ul className="divide-y">{people.map((person) => <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><span className="min-w-0 break-words text-sm">{person.code} · {person.name}</span><Link href={`/beneficiaries/${person.id}/edit`} className="text-sm font-medium text-teal hover:underline">{t("review")}</Link></li>)}</ul> : empty;
+  const personRows = (people: QualityData["missingCenter"]) => people.length ? <ul className="divide-y">{people.map((person) => <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><span className="min-w-0 break-words text-sm">{person.code} · {person.name}</span><Link href={centerOnly ? `/beneficiaries/${person.id}` : `/beneficiaries/${person.id}/edit`} className="text-sm font-medium text-teal hover:underline">{t("review")}</Link></li>)}</ul> : empty;
   return <div className="space-y-5">
     <div className="space-y-3 rounded-xl border bg-card p-4 text-sm sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><p className="font-medium">{t(centerOnly ? "centerScope" : "allCenters")}</p><Button variant="outline" size="sm" disabled={online !== true} onClick={() => router.refresh()}>{t("refresh")}</Button></div>

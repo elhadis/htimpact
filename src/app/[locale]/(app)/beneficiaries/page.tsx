@@ -28,7 +28,7 @@ export default async function BeneficiariesPage({ params }: { params: Promise<{ 
           ) : null
         }
       />
-      <BeneficiariesTable rows={rows} />
+      <BeneficiariesTable admin={session.user.role === "ADMIN"} rows={rows} />
     </div>
   );
 }

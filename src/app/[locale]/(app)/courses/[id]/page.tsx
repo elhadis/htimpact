@@ -1,3 +1,4 @@
+import { AdminRecordActions } from "@/components/admin-record-actions";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { auth } from "@/auth";
@@ -18,7 +19,7 @@ export default async function CoursePage({ params }: { params: Promise<{ locale:
   const t = await getTranslations();
   return (
     <div>
-      <PageHeader eyebrow={course.code} title={course.name} description={course.project.name} />
+      <PageHeader eyebrow={course.code} title={course.name} description={course.project.name} action={session.user.role === "ADMIN" ? <AdminRecordActions entity="courses" id={course.id} label={course.name} updatedAt={course.updatedAt.toISOString()} detail /> : null} />
       <div className="grid gap-3">
         {course.cohorts.map((cohort) => (
           <Link key={cohort.id} href={`/cohorts/${cohort.id}`} className="rounded-xl border bg-card p-4">

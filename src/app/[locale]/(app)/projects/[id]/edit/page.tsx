@@ -25,6 +25,7 @@ export default async function EditProjectPage({
       <PageHeader title={t("projects.edit")} description={project.name} />
       <ProjectForm
         mode="edit"
+        updatedAt={project.updatedAt.toISOString()}
         projectId={project.id}
         defaults={{
           code: project.code,

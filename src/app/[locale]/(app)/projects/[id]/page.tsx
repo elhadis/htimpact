@@ -1,3 +1,4 @@
+import { AdminRecordActions } from "@/components/admin-record-actions";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { auth } from "@/auth";
@@ -5,7 +6,6 @@ import { can } from "@/lib/rbac";
 import { formatDate, formatDateTime, fullName } from "@/lib/format";
 import { getProject, optionLists, progressFromProject } from "@/lib/queries";
 import { Link } from "@/i18n/navigation";
-import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/chrome";
 import { Forbidden } from "@/components/forbidden";
 import { EnumBadge } from "@/components/enum-badge";
@@ -29,7 +29,7 @@ export default async function ProjectDetailPage({
   const t = await getTranslations();
   const progress = progressFromProject(project);
   const options = await optionLists();
-  const canUpdatePeople = can(session.user.role, "beneficiaries", "update");
+  const canUpdatePeople = can(session.user.role, "assignments", "update");
   const canEditProject = can(session.user.role, "projects", "update");
   const activePeople = project.beneficiaries.filter((link) => link.status !== "withdrawn");
 
@@ -41,9 +41,7 @@ export default async function ProjectDetailPage({
         description={project.description ?? t("projects.intro")}
         action={
           canEditProject ? (
-            <Link className={buttonVariants({ variant: "outline" })} href={`/projects/${project.id}/edit`}>
-              {t("common.edit")}
-            </Link>
+            <AdminRecordActions entity="projects" id={project.id} label={project.name} updatedAt={project.updatedAt.toISOString()} detail />
           ) : null
         }
       />

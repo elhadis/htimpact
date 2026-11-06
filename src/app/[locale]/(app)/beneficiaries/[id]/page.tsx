@@ -1,3 +1,4 @@
+import { AdminRecordActions } from "@/components/admin-record-actions";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { auth } from "@/auth";
@@ -5,7 +6,6 @@ import { can } from "@/lib/rbac";
 import { formatDate, fullName } from "@/lib/format";
 import { getBeneficiary } from "@/lib/queries";
 import { Link } from "@/i18n/navigation";
-import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/chrome";
 import { Forbidden } from "@/components/forbidden";
 import { EnumBadge } from "@/components/enum-badge";
@@ -30,9 +30,7 @@ export default async function BeneficiaryPage({
         description={person.community || person.notes || t("beneficiaries.intro")}
         action={
           can(session.user.role, "beneficiaries", "update") ? (
-            <Link className={buttonVariants({ variant: "outline" })} href={`/beneficiaries/${person.id}/edit`}>
-              {t("common.edit")}
-            </Link>
+            <AdminRecordActions entity="beneficiaries" id={person.id} label={fullName(person)} updatedAt={person.updatedAt.toISOString()} detail />
           ) : null
         }
       />

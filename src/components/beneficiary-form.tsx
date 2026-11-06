@@ -8,7 +8,8 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
 import { beneficiarySchema, genders, type BeneficiaryInput } from "@/lib/validators";
-import { createBeneficiary, updateBeneficiary } from "@/server/mutations";
+import { createBeneficiary } from "@/server/mutations";
+import { applyAdminOperation } from "@/server/admin-records";
 import { Button } from "@/components/ui/button";
 import { offlineDb, queueModeEnabled } from "@/lib/offline/db";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,12 +19,14 @@ import { Field } from "@/components/chrome";
 export function BeneficiaryForm({
   mode,
   beneficiaryId,
+  updatedAt,
   defaults,
   projects,
   centers = [],
 }: {
   mode: "create" | "edit";
   beneficiaryId?: string;
+  updatedAt?: string;
   defaults: BeneficiaryInput;
   projects: { id: string; name: string; code: string }[];
   centers?: { id: string; name: string; projects: { projectId: string }[] }[];
@@ -67,14 +70,15 @@ export function BeneficiaryForm({
       }
       return;
     }
-    const result = await updateBeneficiary(beneficiaryId ?? "", payload);
-    if (!result.ok) {
-      toast.error(t(`errors.${result.error}`));
-      return;
-    }
-    toast.success(t("common.saved"));
-    router.push(`/beneficiaries/${result.id}`);
-    router.refresh();
+    const pending = { clientMutationId: crypto.randomUUID(), kind: "update" as const, entity: "beneficiaries" as const, entityId: beneficiaryId ?? "", label: `${values.firstName} ${values.lastName}`, baseUpdatedAt: updatedAt ?? "", values: payload };
+    const queue = async () => { await offlineDb.adminQueue.put(pending); toast.success(t("adminRecords.updateQueued")); };
+    try {
+      if (queueModeEnabled()) { await queue(); return; }
+      const result = await applyAdminOperation(pending);
+      if (!result.ok) { toast.error(t(`errors.${result.error}`)); return; }
+      toast.success(t("common.saved")); router.push(`/beneficiaries/${beneficiaryId}`); router.refresh();
+      window.dispatchEvent(new Event("ht-data-synced"));
+    } catch { try { await queue(); } catch { toast.error(t("errors.syncFailed")); } }
   }
 
   return (
