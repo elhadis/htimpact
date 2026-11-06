@@ -9,7 +9,7 @@ export async function GET() {
   if (!actor?.active) return NextResponse.json({ error: "auth" }, { status: 401, headers });
   const role = actor.role.key;
   const paths = new Set<string>(["/dashboard"]);
-  const resources: Resource[] = ["centers", "transfers", "projects", "beneficiaries", "courses", "cohorts", "sessions", "attendance", "activities", "staff", "reports", "audit", "sync"];
+  const resources: Resource[] = ["quality", "centers", "transfers", "projects", "beneficiaries", "courses", "cohorts", "sessions", "attendance", "activities", "staff", "reports", "audit", "sync"];
   for (const resource of resources) if (can(role, resource, "read")) paths.add(`/${resource}`);
   for (const resource of ["centers", "projects", "beneficiaries", "courses", "cohorts", "sessions", "staff"] as const) {
     if (can(role, resource, "create")) paths.add(`/${resource}/new`);

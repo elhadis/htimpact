@@ -11,7 +11,7 @@ let preparedBuild = null;
 const scopeByClient = new Map();
 const pageCache = (scope) => `ht-impact-pages-v4-${encodeURIComponent(scope)}`;
 const isLaunchPage = (url) => /^\/(en|ar)?\/?$/.test(url.pathname);
-const isAppPage = (url) => /^\/(en|ar)\/(dashboard|centers|transfers|projects|beneficiaries|courses|cohorts|sessions|attendance|activities|staff|reports|audit|sync)(\/|$)/.test(url.pathname);
+const isAppPage = (url) => /^\/(en|ar)\/(dashboard|quality|centers|transfers|projects|beneficiaries|courses|cohorts|sessions|attendance|activities|staff|reports|audit|sync)(\/|$)/.test(url.pathname);
 function pageKey(input) {
   const url = new URL(typeof input === "string" ? input : input.url, self.location.origin);
   url.hash = "";

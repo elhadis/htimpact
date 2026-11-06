@@ -26,6 +26,7 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { can, type AppRole, type Resource } from "@/lib/rbac";
 import { offlineDb, type QueuedAttendance, type QueuedAssignment, type QueuedParticipation, type QueuedEnrollment, type QueuedCourse, type QueuedProject, type QueuedBeneficiary, type QueuedCohort, type QueuedSession, type QueuedActivity, type QueuedCenter, type QueuedTransfer } from "@/lib/offline/db";
 import { saveCenter, requestTransfer } from "@/server/centers";
+import { readSyncScope, recordSyncOutcome } from "@/lib/offline/sync-status";
 import { clearOfflinePages } from "@/components/offline-boundary";
 import { syncQueued, saveParticipation, enrollBeneficiary, createCourse, createProject, createBeneficiary, createCohort, createSession, createActivity } from "@/server/mutations";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -37,6 +38,7 @@ import { toast } from "sonner";
 
 const links: { href: string; key: string; icon: typeof LayoutDashboard; resource?: Resource }[] = [
   { href: "/dashboard", key: "dashboard", icon: LayoutDashboard },
+  { href: "/quality", key: "quality", icon: ClipboardCheck, resource: "quality" },
   { href: "/centers", key: "centers", icon: Building2, resource: "centers" },
   { href: "/transfers", key: "transfers", icon: ArrowRightLeft, resource: "transfers" },
   { href: "/activities", key: "activities", icon: Activity, resource: "activities" },
@@ -95,6 +97,7 @@ export function AppShell({
   async function flush() {
     if (!navigator.onLine || syncInProgress.current) return;
     syncInProgress.current = true;
+    const syncScope = readSyncScope();
     let attendance: QueuedAttendance[];
     let assignments: QueuedAssignment[];
     let participation: QueuedParticipation[];
@@ -124,6 +127,7 @@ export function AppShell({
       transfers = await offlineDb.transferQueue.toArray();
     } catch {
       syncInProgress.current = false;
+      recordSyncOutcome("incomplete", syncScope);
       toast.error(t("errors.syncFailed"));
       return;
     }
@@ -234,11 +238,13 @@ export function AppShell({
         try { const saved = await requestTransfer(mutation.values); if (saved.ok) await offlineDb.transferQueue.delete(mutation.clientMutationId); else failed = true; }
         catch { failed = true; }
       }
+      recordSyncOutcome(failed || rejected ? "incomplete" : conflicts ? "conflicts" : "success", syncScope);
       if (failed || rejected) toast.error(t("errors.syncFailed"));
       else toast.success(conflicts ? t("sync.syncedWithConflicts") : t("sync.synced"));
       router.refresh();
       window.dispatchEvent(new Event("ht-data-synced"));
     } catch {
+      recordSyncOutcome("incomplete", syncScope);
       toast.error(t("errors.syncFailed"));
     } finally {
       syncInProgress.current = false;

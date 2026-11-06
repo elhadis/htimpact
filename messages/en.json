@@ -39,7 +39,8 @@
     "sync": "Sync",
     "centers": "Centers",
     "transfers": "Transfers",
-    "activities": "Activities"
+    "activities": "Activities",
+    "quality": "Data quality & tasks"
   },
   "auth": {
     "email": "Email",
@@ -333,5 +334,37 @@
     "REJECTED": "Rejected",
     "noBeneficiaries": "No beneficiaries available",
     "assignBeforeTransfer": "This beneficiary has no center. Assign the current center in their record before requesting a transfer."
+  },
+  "quality": {
+    "title": "Data quality & tasks",
+    "intro": "Items for follow-up and manual review, based on platform records and this device’s pending changes.",
+    "missingCenter": "Beneficiaries without a center",
+    "missingProject": "Beneficiaries without a project assignment",
+    "attendance": "Sessions with incomplete attendance",
+    "transfers": "Pending transfer requests",
+    "duplicates": "Possible duplicate groups",
+    "localQueue": "Local operations awaiting sync",
+    "conflicts": "Pending sync conflicts",
+    "review": "Review record",
+    "noItems": "No matching items in the displayed data.",
+    "snapshotAt": "Displayed data last updated",
+    "lastSync": "Last successful sync recorded on this device",
+    "notRecorded": "Not recorded",
+    "centerScope": "Follow-up is limited to your center.",
+    "allCenters": "Follow-up across all centers.",
+    "refresh": "Refresh overview",
+    "snapshotNote": "Counts come from server records at the displayed update time.",
+    "offlineNote": "This is a saved copy on this device and may differ from the latest server records.",
+    "localNote": "Unsynced local changes are excluded from server indicators and shown separately in the local operations list.",
+    "attendanceHelp": "Only sessions whose scheduled duration has ended are checked, against currently active learners enrolled before the session. A missing mark does not mean absence.",
+    "missingMarks": "Missing attendance marks: {count}",
+    "duplicateHelp": "An exact full-name match plus birth date or phone identifies a review candidate only. The records may belong to different people. Nothing is merged or deleted automatically.",
+    "nameBirthDate": "Matching full name and birth date",
+    "namePhone": "Matching full name and phone",
+    "storageUnavailable": "Local operations could not be read. Their current count cannot be confirmed.",
+    "lastAttemptFailed": "The last sync attempt did not complete. Review the remaining operations and retry when connected.",
+    "lastAttemptConflicts": "The last sync attempt produced conflicts that need review.",
+    "openSync": "Open synchronization",
+    "loading": "Reading local operations…"
   }
 }

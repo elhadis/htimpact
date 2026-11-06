@@ -10,6 +10,7 @@ export const ROLES = [
 export type AppRole = (typeof ROLES)[number];
 
 export const RESOURCES = [
+  "quality",
   "centers",
   "transfers",
   "activities",
@@ -37,6 +38,7 @@ const ALL = RESOURCES.flatMap((resource) =>
 const ROLE_MATRIX: Record<AppRole, string[]> = {
   ADMIN: ["*"],
   CENTER_MANAGER: [
+    "quality:read",
     "centers:read", "transfers:read", "transfers:create",
     "projects:read", "beneficiaries:create", "beneficiaries:read", "beneficiaries:update",
     "courses:create", "courses:read", "cohorts:create", "cohorts:read", "cohorts:update",
